@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func JoinHorizontal2(w int, a, b string) string {
@@ -43,4 +44,17 @@ func All[T any](sl iter.Seq[T], cond func (T) bool) bool {
 	}
 
 	return true
+}
+
+func Overflow(str string, maxWidth int) string {
+	if lipgloss.Width(str) <= maxWidth {
+		return str
+	}
+
+	lines := strings.Split(str, "\n")
+	for i := range lines {
+		lines[i] = ansi.Truncate(lines[i], maxWidth, "…")
+	}
+
+	return strings.Join(lines, "\n")
 }

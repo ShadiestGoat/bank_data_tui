@@ -17,27 +17,36 @@ func (c Model) View() string {
 	sections := []string{}
 	valid := true
 
-	for i, t := range c.titles {
+	for i, f := range c.dataFields {
 		fieldStyle := styles.STYLE_FIELD
-		txt := c.textFields[i]
+		txt := c.inpFields[i]
 		if c.focusedField == i {
 			fieldStyle = fieldStyle.BorderForeground(styles.COLOR_MAIN)
 		}
 
 		errMsg := ""
+		apiErr := false
 		if txt.Err != nil {
 			valid = false
 
 			if txt.Value() != "" || errors.Is(txt.Err, ErrRequired) {
-				errMsg = txt.Err.Error() + " "
+				errMsg = txt.Err.Error()
 			}
+		} else if f.apiErr != "" {
+			apiErr = true
+			errMsg = f.apiErr
 		}
+
+		field := fieldStyle.Render(txt.View())
 
 		sections = append(sections, utils.JoinHorizontalSpread(
 			c.width, 1,
-			t,
-			lipgloss.NewStyle().Faint(true).Italic(true).Render(errMsg),
-			fieldStyle.Render(txt.View()),
+			f.Title,
+			utils.Overflow(
+				lipgloss.NewStyle().Faint(true).Italic(true).Bold(apiErr).Render(errMsg),
+				c.width - lipgloss.Width(f.Title) - lipgloss.Width(field) - 2,
+			) + " ",
+			field,
 		))
 	}
 
@@ -47,18 +56,10 @@ func (c Model) View() string {
 	}
 
 	for i, b := range btns {
-		fieldStyle := styles.STYLE_BTN
-		if i == c.focusedField-len(c.editableFields) {
-			if i == 0 {
-				if valid {
-					fieldStyle = styles.STYLE_BTN_SELECTED
-				} else {
-					fieldStyle = styles.STYLE_BTN_SELECTED_DISABLED
-				}
-			} else {
-				fieldStyle = styles.STYLE_BTN_SELECTED_BAD
-			}
-		}
+		fieldStyle := styles.StyleBtn(
+			!valid,
+			i == c.focusedField-len(c.dataFields),
+		)
 
 		btns[i] = fieldStyle.Render(b)
 	}

@@ -14,8 +14,23 @@ func newCategoryEditor(c *api.APIClient, w int, cat *api.Category) *editor.Model
 	return editor.New(
 		w-WIDTH_OFFSET_EDITOR,
 		nil,
-		[]*string{&cat.Name, &cat.Color, &cat.Icon},
-		editorTitles,
+		[]*editor.DataField{
+			{
+				Title: "Name",
+				ID: "name",
+				Value: &cat.Name,
+			},
+			{
+				Title: "Color",
+				ID: "color",
+				Value: &cat.Color,
+			},
+			{
+				Title: "Icon",
+				ID: "icon",
+				Value: &cat.Icon,
+			},
+		},
 		func() (string, error) { return c.CategoriesCreate(&cat.SavableCategory) },
 		func() error { return c.CategoriesUpdate(cat) },
 		editor.RequireFields(0, 1, 2),

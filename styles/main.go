@@ -15,7 +15,21 @@ var (
 	STYLE_BTN   = STYLE_FIELD.Padding(1, 2)
 
 	style_base_btn_selected = STYLE_BTN.Foreground(lipgloss.NoColor{})
+	STYLE_BTN_DISABLED = STYLE_BTN.Foreground(COLOR_DISABLED).BorderForeground(COLOR_DISABLED)
 	STYLE_BTN_SELECTED = style_base_btn_selected.Background(COLOR_MAIN)
 	STYLE_BTN_SELECTED_DISABLED = style_base_btn_selected.Background(COLOR_DISABLED).BorderForeground(COLOR_DISABLED)
 	STYLE_BTN_SELECTED_BAD = style_base_btn_selected.Background(COLOR_WRONG)
 )
+
+func StyleBtn(disabled, selected bool) lipgloss.Style {
+	switch {
+	case disabled && selected:
+		return STYLE_BTN_SELECTED_DISABLED
+	case disabled:
+		return STYLE_BTN_DISABLED
+	case selected:
+		return STYLE_BTN_SELECTED
+	default:
+		return STYLE_BTN
+	}
+}

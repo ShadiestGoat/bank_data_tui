@@ -3,20 +3,27 @@ package editor
 import (
 	"slices"
 
+	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/utils"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+type DataField struct {
+	Title     string
+	Value     *string
+	ID        string
+	apiErr    string
+}
 
 type Model struct {
 	width int
 
 	id *string
 
-	focusedField   int
-	editableFields []*string
-	titles         []string
-	textFields     []textinput.Model
+	focusedField int
+	dataFields   []*DataField
+	inpFields    []textinput.Model
 
 	popupVisible bool
 	popupOnNo    bool
@@ -25,39 +32,38 @@ type Model struct {
 	update func() error
 }
 
-func New(w int, id *string, editableFields []*string, fieldTitles []string, createFunc func() (string, error), updateFunc func() error, mods ...FieldsMod) *Model {
-	fields := make([]textinput.Model, len(fieldTitles))
-	for i, t := range fieldTitles {
+func New(w int, id *string, dataFields []*DataField, createFunc func() (string, error), updateFunc func() error, mods ...FieldsMod) *Model {
+	inpFields := make([]textinput.Model, len(dataFields))
+	for i, d := range dataFields {
 		f := textinput.New()
 		f.Prompt = ""
 		f.Blur()
 		f.Width = 15
-		f.Placeholder = t
+		f.Placeholder = d.Title
 
-		fields[i] = f
+		inpFields[i] = f
 	}
 
 	for _, m := range mods {
-		m(fields)
+		m(inpFields)
 	}
 
-	for i, f := range editableFields {
-		fields[i].SetValue(*f)
+	for i, f := range dataFields {
+		inpFields[i].SetValue(*f.Value)
 	}
 
 	return &Model{
-		width:          w,
-		id:             id,
-		editableFields: editableFields,
-		titles:         fieldTitles,
-		textFields:     fields,
-		create:         createFunc,
-		update:         updateFunc,
+		width:      w,
+		id:         id,
+		dataFields: dataFields,
+		inpFields:  inpFields,
+		create:     createFunc,
+		update:     updateFunc,
 	}
 }
 
 func (c *Model) Init() tea.Cmd {
-	cmd := c.textFields[0].Focus()
+	cmd := c.inpFields[0].Focus()
 
 	return cmd
 }
@@ -79,14 +85,14 @@ func (c *Model) save() error {
 
 func (c *Model) focusField(f int) tea.Cmd {
 	if !c.inButtons(c.focusedField) {
-		c.textFields[c.focusedField].Blur()
+		c.inpFields[c.focusedField].Blur()
 	}
 	c.focusedField = f
 	if c.inButtons(c.focusedField) {
 		return nil
 	}
 
-	return c.textFields[c.focusedField].Focus()
+	return c.inpFields[c.focusedField].Focus()
 }
 
 func (c *Model) incFocusField(d int) tea.Cmd {
@@ -94,8 +100,8 @@ func (c *Model) incFocusField(d int) tea.Cmd {
 
 	if nf < 0 {
 		// focus on the left button (save) in case of overflow to the minus
-		return c.focusField(len(c.textFields))
-	} else if nf > len(c.textFields)+1 {
+		return c.focusField(len(c.inpFields))
+	} else if nf > len(c.inpFields)+1 {
 		return c.focusField(0)
 	}
 
@@ -103,12 +109,12 @@ func (c *Model) incFocusField(d int) tea.Cmd {
 }
 
 func (c Model) inButtons(i int) bool {
-	return i >= len(c.textFields)
+	return i >= len(c.inpFields)
 }
 
 func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	var cmd tea.Cmd
-	batcher := make([]tea.Cmd, 0, len(c.textFields)+1)
+	batcher := make([]tea.Cmd, 0, len(c.inpFields)+1)
 
 	passToChildren := true
 
@@ -140,7 +146,7 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 				if msg.String() == "down" {
 					batcher = append(batcher, c.focusField(0))
 				} else {
-					batcher = append(batcher, c.focusField(len(c.textFields)-1))
+					batcher = append(batcher, c.focusField(len(c.inpFields)-1))
 				}
 			} else if !c.inButtons(c.focusedField) && (msg.String() == "left" || msg.String() == "right") {
 				passToChildren = true
@@ -150,19 +156,14 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 		case "enter":
 			passToChildren = false
 			switch c.focusedField {
-			case len(c.textFields):
+			case len(c.inpFields):
 				// save
-				if utils.All(slices.Values(c.textFields), func(v textinput.Model) bool { return v.Err == nil }) {
-					// TODO: Implement locking mechanism so that this op doesn't block the entire app
-					if err := c.save(); err != nil {
-						panic(err)
-					}
-				}
-			case len(c.textFields) + 1:
+				c.handleSaveEnter()
+			case len(c.inpFields) + 1:
 				// reset
 				c.focusField(0)
-				for i, ogContent := range c.editableFields {
-					c.textFields[i].SetValue(*ogContent)
+				for i, d := range c.dataFields {
+					c.inpFields[i].SetValue(*d.Value)
 				}
 			default:
 				batcher = append(batcher, c.focusField(c.focusedField+1))
@@ -171,8 +172,8 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	}
 
 	if passToChildren {
-		for i, f := range c.textFields {
-			c.textFields[i], cmd = f.Update(msg)
+		for i, f := range c.inpFields {
+			c.inpFields[i], cmd = f.Update(msg)
 			batcher = append(batcher, cmd)
 		}
 	}
@@ -186,4 +187,34 @@ func (c *Model) SetWidth(w int) {
 
 func (c *Model) SetIDPtr(id *string) {
 	c.id = id
+}
+
+// TODO: Implement locking mechanism so that this op doesn't block the entire app
+func (c *Model) handleSaveEnter() {
+	if utils.Any(slices.Values(c.inpFields), func(v textinput.Model) bool { return v.Err != nil }) {	
+		return
+	}
+
+	for i, f := range c.inpFields {
+		*c.dataFields[i].Value = f.Value()
+		c.dataFields[i].apiErr = ""
+	}
+
+	err := c.save()
+	if err == nil {
+		return
+	}
+
+	if err, ok := err.(*api.ValidationErr); !ok {
+		panic(err)
+	} else {
+		for _, v := range err.Details {
+			i := slices.IndexFunc(c.dataFields, func(f *DataField) bool {return f.ID == v[0]})
+			if i == -1 {
+				continue
+			}
+
+			c.dataFields[i].apiErr = v[1]
+		}
+	}
 }

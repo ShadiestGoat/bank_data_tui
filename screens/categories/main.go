@@ -48,10 +48,6 @@ func (c newCategoryItem) FilterValue() string { return string([]byte{0}) }
 func (c newCategoryItem) Title() string       { return "Make a new one" }
 func (c newCategoryItem) Description() string { return "Special Option!" }
 
-var (
-	editorTitles = []string{"Name", "Color", "Icon"}
-)
-
 func New(c *api.APIClient, w, h int) *Model {
 	list := list.New([]list.Item{
 		newCategoryItem{},
