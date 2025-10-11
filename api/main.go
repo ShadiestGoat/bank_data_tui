@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -24,11 +24,43 @@ type RespLogin struct {
 }
 
 type APIErr struct {
-	Status int
-	Err    string
+	Status   int
+	RespBody []byte
 }
 
-func (a APIErr) Error() string { return fmt.Sprintf("%d: %s", a.Status, a.Err) }
+func (a APIErr) Error() string {
+	return fmt.Sprintf("%d: %s", a.Status, a.RespBody)
+}
+
+type StdAPIError struct {
+	Status int
+	Message string `json:"error"`
+	Details []string `json:"details"`
+}
+
+func (s StdAPIError) Error() string {
+	return fmt.Sprintf("%d: %s", s.Status, s.Message)
+}
+
+func (v StdAPIError) Is(err error) bool {
+	_, ok := err.(*APIErr)
+	return ok
+}
+
+type ValidationErr struct {
+	Status int
+	// List of [field id, error]
+	Details [][2]string
+}
+
+func (v ValidationErr) Is(err error) bool {
+	_, ok := err.(*APIErr)
+	return ok
+}
+
+func (ValidationErr) Error() string {
+	return "Resource validation didn't go over well :("
+}
 
 func fetch[T any](method, path string, body any, authHeader string) (*T, error) {
 	inpBuf := &bytes.Buffer{}
@@ -55,8 +87,33 @@ func fetch[T any](method, path string, body any, authHeader string) (*T, error) 
 
 	if resp.StatusCode != 200 {
 		d, _ := io.ReadAll(resp.Body)
+		std := &StdAPIError{Status: resp.StatusCode}
+		if err := json.Unmarshal(d, std); err != nil {
+			return nil, &APIErr{resp.StatusCode, d}
+		}
 
-		return nil, &APIErr{resp.StatusCode, string(d)}
+		if resp.StatusCode == 400 && len(std.Details) != 0 {
+			verr := &ValidationErr{
+				Details: make([][2]string, len(std.Details)),
+			}
+			good := true
+
+			for i, v := range std.Details {
+				spl := strings.SplitN(v, ": ", 2)
+				if len(spl) != 2 {
+					good = false
+					break
+				}
+
+				verr.Details[i] = [2]string{spl[0], spl[1]}
+			}
+
+			if good {
+				return nil, verr
+			}
+		}
+
+		return nil, std
 	}
 
 	var data T
@@ -137,39 +194,4 @@ type APIClient struct {
 
 func (a *APIClient) Login(userAndPass [2]string) error {
 	return loginIntoClient(a, userAndPass)
-}
-
-type SavableCategory struct {
-	Color string `json:"color"`
-	Icon  string `json:"icon"`
-	Name  string `json:"name"`
-}
-
-type Category struct {
-	ID string `json:"id"`
-
-	SavableCategory
-}
-
-func (c *APIClient) CategoriesFetch() ([]*Category, error) {
-	return deArray(easyFetch[[]*Category](c, `GET`, `/categories`, nil))
-}
-
-type RespCreated struct {
-	ID string `json:"id"`
-}
-
-func (c *APIClient) CategoriesCreate(s *SavableCategory) (string, error) {
-	log.Printf("Creating %v\n", s)
-	resp, err := easyFetch[RespCreated](c, `POST`, `/categories`, s)
-	if err != nil {
-		log.Printf("Oh-oh :0 %v\n", err)
-		return "", err
-	}
-
-	return resp.ID, nil
-}
-
-func (c *APIClient) CategoriesUpdate(s *Category) (error) {
-	panic("Not implemented :3")
 }
