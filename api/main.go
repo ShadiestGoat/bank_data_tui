@@ -85,7 +85,7 @@ func fetch[T any](method, path string, body any, authHeader string) (*T, error) 
 		return nil, err
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != 200 && resp.StatusCode != 204 {
 		d, _ := io.ReadAll(resp.Body)
 		std := &StdAPIError{Status: resp.StatusCode}
 		if err := json.Unmarshal(d, std); err != nil {
@@ -114,6 +114,10 @@ func fetch[T any](method, path string, body any, authHeader string) (*T, error) 
 		}
 
 		return nil, std
+	}
+
+	if resp.StatusCode == 204 {
+		return nil, nil
 	}
 
 	var data T
@@ -152,6 +156,12 @@ func loginIntoClient(c *APIClient, ovr [2]string) error {
 	c.jwt = parsed
 
 	return nil
+}
+
+func easyNilFetch(c *APIClient, method, path string, body any) error {
+	_, err := easyFetch[any](c, method, path, body)
+
+	return err
 }
 
 func easyFetch[T any](c *APIClient, method, path string, body any) (*T, error) {

@@ -29,6 +29,6 @@ func (c *APIClient) CategoriesCreate(s *SavableCategory) (string, error) {
 	return resp.ID, nil
 }
 
-func (c *APIClient) CategoriesUpdate(s *Category) error {
-	panic("Not implemented :3")
+func (c *APIClient) CategoriesUpdate(id string, s *SavableCategory) error {
+	return easyNilFetch(c, `PUT`, `/categories/` + id, s)
 }

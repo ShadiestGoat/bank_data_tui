@@ -32,7 +32,7 @@ func newCategoryEditor(c *api.APIClient, w int, cat *api.Category) *editor.Model
 			},
 		},
 		func() (string, error) { return c.CategoriesCreate(&cat.SavableCategory) },
-		func() error { return c.CategoriesUpdate(cat) },
+		func(id string) error { return c.CategoriesUpdate(id, &cat.SavableCategory) },
 		editor.RequireFields(0, 1, 2),
 		editor.AddFieldValidator(1, func(s string) error {
 			if len(s) != 6 {

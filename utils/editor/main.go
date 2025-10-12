@@ -29,10 +29,10 @@ type Model struct {
 	popupOnNo    bool
 
 	create func() (string, error)
-	update func() error
+	update func(id string) error
 }
 
-func New(w int, id *string, dataFields []*DataField, createFunc func() (string, error), updateFunc func() error, mods ...FieldsMod) *Model {
+func New(w int, id *string, dataFields []*DataField, createFunc func() (string, error), updateFunc func(id string) error, mods ...FieldsMod) *Model {
 	inpFields := make([]textinput.Model, len(dataFields))
 	for i, d := range dataFields {
 		f := textinput.New()
@@ -77,7 +77,7 @@ func (c *Model) save() error {
 
 		c.id = &id
 	} else {
-		return c.update()
+		return c.update(*c.id)
 	}
 
 	return nil
@@ -205,10 +205,10 @@ func (c *Model) handleSaveEnter() {
 		return
 	}
 
-	if err, ok := err.(*api.ValidationErr); !ok {
+	if e, ok := err.(*api.ValidationErr); !ok {
 		panic(err)
 	} else {
-		for _, v := range err.Details {
+		for _, v := range e.Details {
 			i := slices.IndexFunc(c.dataFields, func(f *DataField) bool {return f.ID == v[0]})
 			if i == -1 {
 				continue
