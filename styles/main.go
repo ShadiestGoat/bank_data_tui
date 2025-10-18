@@ -21,15 +21,29 @@ var (
 	STYLE_BTN_SELECTED_BAD = style_base_btn_selected.Background(COLOR_WRONG)
 )
 
-func StyleBtn(disabled, selected bool) lipgloss.Style {
-	switch {
-	case disabled && selected:
-		return STYLE_BTN_SELECTED_DISABLED
-	case disabled:
-		return STYLE_BTN_DISABLED
-	case selected:
-		return STYLE_BTN_SELECTED
-	default:
-		return STYLE_BTN
+func StyleBtn(disabled, selected, bad, small bool) lipgloss.Style {
+	style := STYLE_FIELD
+	if !small {
+		style = STYLE_BTN
 	}
+
+	if disabled && !selected {
+		style = style.Foreground(COLOR_DISABLED)
+	} else if selected {
+		style = style.Foreground(lipgloss.NoColor{})
+	}
+
+	var color lipgloss.TerminalColor = COLOR_MAIN
+	switch {
+	case disabled:
+		color = COLOR_DISABLED
+	case bad:
+		color = COLOR_WRONG
+	}
+
+	if selected {
+		style = style.Background(color)
+	}
+
+	return style.BorderForeground(color)
 }

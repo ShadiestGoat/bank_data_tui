@@ -10,12 +10,12 @@ import (
 var (
 	STYLE_HEADER_TEXT     = lipgloss.NewStyle().Foreground(styles.COLOR_MAIN).Margin(1)
 	STYLE_HEADER_SELECTED = STYLE_HEADER_TEXT.Bold(true).Underline(true)
-	STYLE_HEADER          = lipgloss.NewStyle().Border(lipgloss.DoubleBorder(), false, false, true, false).Margin(0, 0, 2, 0).BorderForeground(styles.COLOR_MAIN)
+	STYLE_HEADER          = lipgloss.NewStyle().Border(lipgloss.DoubleBorder(), false, false, true, false).Margin(0, 0, 1, 0).BorderForeground(styles.COLOR_MAIN)
 )
 
 const (
-	// 2 (margin bottom) + 1 * 2 (padding top & bot) + 1 line of border + 1 line of text
-	HEADER_HEIGHT = 6
+	// 1 (margin bottom) + 1 * 2 (padding top & bot) + 1 line of border + 1 line of text
+	HEADER_HEIGHT = 1 + 1*2 + 1 + 1
 )
 
 var HEADER_SCREENS = []struct {
@@ -47,11 +47,11 @@ func (m mainApp) renderHeader() string {
 }
 
 func (m mainApp) View() string {
-	box := lipgloss.NewStyle().Width(m.width).Height(m.height).AlignHorizontal(lipgloss.Center)
+	box := lipgloss.NewStyle().Width(m.width).Height(m.height).MaxHeight(m.height).Align(lipgloss.Center, lipgloss.Top)
 
 	if m.width == 0 || m.height == 0 {
 		return ""
-	} else if m.width < 30 || m.height < 20 {
+	} else if m.width < 50 || m.height < 20 {
 		return box.AlignVertical(lipgloss.Center).Render("Too small")
 	}
 

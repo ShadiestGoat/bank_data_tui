@@ -10,16 +10,16 @@ import (
 )
 
 type DataField struct {
-	Title     string
-	Value     *string
-	ID        string
-	apiErr    string
+	Title  string
+	Value  *string
+	ID     string
+	apiErr string
 }
 
 type Model struct {
 	width int
 
-	id *string
+	ItemID string
 
 	focusedField int
 	dataFields   []*DataField
@@ -28,11 +28,11 @@ type Model struct {
 	popupVisible bool
 	popupOnNo    bool
 
-	create func() (string, error)
-	update func(id string) error
+	create      func() (string, error)
+	update, del func(id string) error
 }
 
-func New(w int, id *string, dataFields []*DataField, createFunc func() (string, error), updateFunc func(id string) error, mods ...FieldsMod) *Model {
+func New(w int, id string, dataFields []*DataField, createFunc func() (string, error), updateFunc, delFunc func(id string) error, mods ...FieldsMod) *Model {
 	inpFields := make([]textinput.Model, len(dataFields))
 	for i, d := range dataFields {
 		f := textinput.New()
@@ -54,11 +54,12 @@ func New(w int, id *string, dataFields []*DataField, createFunc func() (string, 
 
 	return &Model{
 		width:      w,
-		id:         id,
+		ItemID:     id,
 		dataFields: dataFields,
 		inpFields:  inpFields,
 		create:     createFunc,
 		update:     updateFunc,
+		del: delFunc,
 	}
 }
 
@@ -68,19 +69,26 @@ func (c *Model) Init() tea.Cmd {
 	return cmd
 }
 
-func (c *Model) save() error {
-	if c.id == nil {
+type ItemNew string
+type ItemUpdate string
+type ItemDel string
+
+func (c *Model) save() (tea.Msg, error) {
+	if c.ItemID == "" {
 		id, err := c.create()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		c.id = &id
-	} else {
-		return c.update(*c.id)
+		c.ItemID = id
+		return ItemNew(id), nil
 	}
 
-	return nil
+	err := c.update(c.ItemID)
+	if err != nil {
+		return nil, err
+	}
+	return ItemUpdate(c.ItemID), nil
 }
 
 func (c *Model) focusField(f int) tea.Cmd {
@@ -101,7 +109,7 @@ func (c *Model) incFocusField(d int) tea.Cmd {
 	if nf < 0 {
 		// focus on the left button (save) in case of overflow to the minus
 		return c.focusField(len(c.inpFields))
-	} else if nf > len(c.inpFields)+1 {
+	} else if nf > len(c.inpFields)+2 {
 		return c.focusField(0)
 	}
 
@@ -158,8 +166,16 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 			switch c.focusedField {
 			case len(c.inpFields):
 				// save
-				c.handleSaveEnter()
+				batcher = append(batcher, c.handleSaveEnter())
 			case len(c.inpFields) + 1:
+				// delete
+				err := c.del(c.ItemID)
+				if err != nil {
+					// TODO: Better error handling lmao
+					panic("Can't delete: " + err.Error())
+				}
+				batcher = append(batcher, func() tea.Msg { return ItemDel(c.ItemID) })
+			case len(c.inpFields) + 2:
 				// reset
 				c.focusField(0)
 				for i, d := range c.dataFields {
@@ -185,14 +201,10 @@ func (c *Model) SetWidth(w int) {
 	c.width = w
 }
 
-func (c *Model) SetIDPtr(id *string) {
-	c.id = id
-}
-
 // TODO: Implement locking mechanism so that this op doesn't block the entire app
-func (c *Model) handleSaveEnter() {
-	if utils.Any(slices.Values(c.inpFields), func(v textinput.Model) bool { return v.Err != nil }) {	
-		return
+func (c *Model) handleSaveEnter() tea.Cmd {
+	if utils.Any(slices.Values(c.inpFields), func(v textinput.Model) bool { return v.Err != nil }) {
+		return nil
 	}
 
 	for i, f := range c.inpFields {
@@ -200,16 +212,20 @@ func (c *Model) handleSaveEnter() {
 		c.dataFields[i].apiErr = ""
 	}
 
-	err := c.save()
+	msg, err := c.save()
 	if err == nil {
-		return
+		if msg != nil {
+			return func() tea.Msg { return msg }
+		}
+
+		return nil
 	}
 
 	if e, ok := err.(*api.ValidationErr); !ok {
 		panic(err)
 	} else {
 		for _, v := range e.Details {
-			i := slices.IndexFunc(c.dataFields, func(f *DataField) bool {return f.ID == v[0]})
+			i := slices.IndexFunc(c.dataFields, func(f *DataField) bool { return f.ID == v[0] })
 			if i == -1 {
 				continue
 			}
@@ -217,4 +233,6 @@ func (c *Model) handleSaveEnter() {
 			c.dataFields[i].apiErr = v[1]
 		}
 	}
+
+	return nil
 }

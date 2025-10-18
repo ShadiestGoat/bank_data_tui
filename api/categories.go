@@ -32,3 +32,7 @@ func (c *APIClient) CategoriesCreate(s *SavableCategory) (string, error) {
 func (c *APIClient) CategoriesUpdate(id string, s *SavableCategory) error {
 	return easyNilFetch(c, `PUT`, `/categories/` + id, s)
 }
+
+func (c *APIClient) CategoriesDelete(id string) error {
+	return easyNilFetch(c, `DELETE`, `/categories/` + id, nil)
+}

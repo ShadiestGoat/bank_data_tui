@@ -39,35 +39,50 @@ func (c Model) View() string {
 
 		field := fieldStyle.Render(txt.View())
 
-		sections = append(sections, utils.JoinHorizontalSpread(
+		sections = append(sections, utils.JoinHorizontalWithSpacer(
 			c.width, 1,
 			f.Title,
 			utils.Overflow(
 				lipgloss.NewStyle().Faint(true).Italic(true).Bold(apiErr).Render(errMsg),
-				c.width - lipgloss.Width(f.Title) - lipgloss.Width(field) - 2,
-			) + " ",
+				c.width-lipgloss.Width(f.Title)-lipgloss.Width(field)-2,
+			)+" ",
 			field,
 		))
 	}
 
-	btns := []string{"Save", "Reset"}
-	if c.id != nil {
-		btns[0] = "Update"
-	}
-
-	for i, b := range btns {
-		fieldStyle := styles.StyleBtn(
-			!valid,
-			i == c.focusedField-len(c.dataFields),
-		)
-
-		btns[i] = fieldStyle.Render(b)
+	btnText := []string{"Save", "Reset"}
+	if c.ItemID != "" {
+		btnText[0] = "Update"
+		btnText[1] = "Delete"
+		btnText = append(btnText, "Reset")
 	}
 
 	sections = append(
 		sections,
-		utils.JoinHorizontal2(c.width, btns[0], btns[1]),
+		scaleButtons(c.width, valid, c.focusedField - len(c.dataFields), btnText),
 	)
 
 	return strings.Join(sections, "\n\n")
+}
+
+func scaleButtons(w int, valid bool, selectedBtn int, btnText []string) string {
+	if t := renderButtons(w, valid, selectedBtn, false, btnText); t != "" {
+		return t
+	}
+
+	return renderButtons(w, valid, selectedBtn, true, btnText)
+}
+
+func renderButtons(w int, valid bool, selectedBtn int, small bool, btnText []string) string {
+	btns := make([]string, len(btnText))
+	for i, t := range btnText {
+		btns[i] = styles.StyleBtn(
+			!valid && i == 0,
+			i == selectedBtn,
+			i != 0,
+			small,
+		).Render(t)
+	}
+
+	return utils.JoinHorizontalEqualSpread(w, btns...)
 }
