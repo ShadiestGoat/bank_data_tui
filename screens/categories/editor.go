@@ -2,15 +2,11 @@ package categories
 
 import (
 	"fmt"
-	"io"
 	"strconv"
 
 	"github.com/bank_data_tui/api"
-	"github.com/bank_data_tui/styles"
 	"github.com/bank_data_tui/utils/editor"
 	"github.com/bank_data_tui/utils/listeditor"
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/rivo/uniseg"
@@ -48,16 +44,26 @@ func (c *categoryImpl) NewEditor(w, h int, v *categoryProxy) *editor.Model {
 				Title: "Name",
 				ID:    "name",
 				Value: &v.Name,
+				Row: 0,
 			},
 			{
 				Title: "Color",
 				ID:    "color",
 				Value: &v.Color,
+				Row: 1,
+				StyleCB: func(v, err string, selected bool, cur lipgloss.Style) lipgloss.Style {
+					if !selected || err != "" {
+						return cur
+					}
+
+					return cur.BorderForeground(lipgloss.Color("#" + v)).BorderStyle(lipgloss.ASCIIBorder())
+				},
 			},
 			{
 				Title: "Icon",
 				ID:    "icon",
 				Value: &v.Icon,
+				Row: 2,
 			},
 		},
 		func() (string, error) {
@@ -81,38 +87,4 @@ func (c *categoryImpl) NewEditor(w, h int, v *categoryProxy) *editor.Model {
 			return nil
 		}),
 	)
-}
-
-type categoryDelegate struct{}
-
-func (c categoryDelegate) Spacing() int { return 1 }
-func (c categoryDelegate) Height() int  { return 1 }
-
-func (c categoryDelegate) Render(w io.Writer, m list.Model, i int, v list.Item) {
-	style := lipgloss.NewStyle().Foreground(styles.COLOR_MAIN)
-	if m.GlobalIndex() == i {
-		style = style.Underline(true)
-	}
-
-	txt, ok := v.(listeditor.NewItem)
-	if ok {
-		w.Write(
-			[]byte(" " + style.Render(string(txt))),
-		)
-
-		return
-	}
-
-	cat := v.(*categoryProxy)
-	if err := verifyColor(cat.Color); err == nil {
-		style = style.Foreground(lipgloss.Color("#" + cat.Color))
-	}
-
-	w.Write(
-		[]byte(" " + style.Render("["+cat.Icon+"] "+cat.Name)),
-	)
-}
-
-func (c categoryDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
-	return nil
 }

@@ -7,6 +7,10 @@ import (
 )
 
 var ErrRequired = errors.New("Required")
+type APIErr string
+func (a APIErr) Error() string {
+	return string(a)
+}
 
 type FieldsMod func(fields []textinput.Model)
 

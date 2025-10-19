@@ -16,10 +16,6 @@ func (c *APIClient) CategoriesFetch() ([]*Category, error) {
 	return deArray(easyFetch[[]*Category](c, `GET`, `/categories`, nil))
 }
 
-type RespCreated struct {
-	ID string `json:"id"`
-}
-
 func (c *APIClient) CategoriesCreate(s *SavableCategory) (string, error) {
 	resp, err := easyFetch[RespCreated](c, `POST`, `/categories`, s)
 	if err != nil {

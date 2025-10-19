@@ -6,6 +6,7 @@ import (
 
 	"github.com/bank_data_tui/styles"
 	"github.com/bank_data_tui/utils"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -17,37 +18,19 @@ func (c Model) View() string {
 	sections := []string{}
 	valid := true
 
-	for i, f := range c.dataFields {
-		fieldStyle := styles.STYLE_FIELD
-		txt := c.inpFields[i]
-		if c.focusedField == i {
-			fieldStyle = fieldStyle.BorderForeground(styles.COLOR_MAIN)
-		}
-
-		errMsg := ""
-		apiErr := false
-		if txt.Err != nil {
-			valid = false
-
-			if txt.Value() != "" || errors.Is(txt.Err, ErrRequired) {
-				errMsg = txt.Err.Error()
+	// last row has special render handling
+	for _, row := range c.layout[:len(c.layout) - 1] {
+		if len(row) == 1 {
+			i := row[0]
+			sections = append(sections, renderRowField(c.width, &c.inpFields[i], c.dataFields[i], c.focusedField == i))
+		} else {
+			parts := make([]string, 0, len(row))
+			for _, i := range row {
+				parts = append(parts, renderField(&c.inpFields[i], c.dataFields[i], c.focusedField == i))
 			}
-		} else if f.apiErr != "" {
-			apiErr = true
-			errMsg = f.apiErr
+
+			sections = append(sections, utils.JoinHorizontalEqualSpread(c.width, parts...))
 		}
-
-		field := fieldStyle.Render(txt.View())
-
-		sections = append(sections, utils.JoinHorizontalWithSpacer(
-			c.width, 1,
-			f.Title,
-			utils.Overflow(
-				lipgloss.NewStyle().Faint(true).Italic(true).Bold(apiErr).Render(errMsg),
-				c.width-lipgloss.Width(f.Title)-lipgloss.Width(field)-2,
-			)+" ",
-			field,
-		))
 	}
 
 	btnText := []string{"Save", "Reset"}
@@ -57,9 +40,14 @@ func (c Model) View() string {
 		btnText = append(btnText, "Reset")
 	}
 
+	selectedBtn := -1
+	if c.focusedField < 0 {
+		selectedBtn = -c.focusedField - 1
+	}
+
 	sections = append(
 		sections,
-		scaleButtons(c.width, valid, c.focusedField - len(c.dataFields), btnText),
+		scaleButtons(c.width, valid, selectedBtn, btnText),
 	)
 
 	return strings.Join(sections, "\n\n")
@@ -85,4 +73,59 @@ func renderButtons(w int, valid bool, selectedBtn int, small bool, btnText []str
 	}
 
 	return utils.JoinHorizontalEqualSpread(w, btns...)
+}
+
+func renderRowField(w int, txt *textinput.Model, data *DataField, selected bool) string {
+	fieldStyle := styles.STYLE_FIELD
+	if selected {
+		fieldStyle = fieldStyle.BorderForeground(styles.COLOR_MAIN)
+	}
+
+	errMsg := ""
+	if txt.Err != nil {
+		if txt.Value() != "" || errors.Is(txt.Err, ErrRequired) {
+			errMsg = txt.Err.Error()
+		}
+	}
+
+	if data.StyleCB != nil {
+		fieldStyle = data.StyleCB(txt.Value(), errMsg, selected, fieldStyle)
+	}
+	field := fieldStyle.Render(txt.View())
+
+	return utils.JoinHorizontalWithSpacer(
+		w, 1,
+		data.Title,
+		utils.Overflow(
+			lipgloss.NewStyle().Faint(true).Italic(true).Bold(errors.Is(txt.Err, APIErr(""))).Render(errMsg),
+			w-lipgloss.Width(data.Title)-lipgloss.Width(field)-2,
+		)+" ",
+		field,
+	)
+}
+
+func renderField(txt *textinput.Model, data *DataField, selected bool) string {
+	fieldStyle := styles.STYLE_FIELD
+	if selected {
+		fieldStyle = fieldStyle.BorderForeground(styles.COLOR_MAIN)
+	}
+
+	errMsg := ""
+	if txt.Err != nil {
+		if txt.Value() != "" || errors.Is(txt.Err, ErrRequired) {
+			errMsg = txt.Err.Error()
+			fieldStyle = fieldStyle.BorderBottom(false)
+		}
+	}
+
+	if data.StyleCB != nil {
+		fieldStyle = data.StyleCB(txt.Value(), errMsg, selected, fieldStyle)
+	}
+
+	out := fieldStyle.Render(txt.View())
+	if errMsg != "" {
+		out += "\n" + utils.Overflow(errMsg, lipgloss.Width(out))
+	}
+
+	return out
 }

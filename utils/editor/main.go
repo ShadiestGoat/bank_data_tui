@@ -1,19 +1,24 @@
 package editor
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/utils"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type DataField struct {
 	Title  string
 	Value  *string
 	ID     string
-	apiErr string
+
+	Row      int
+	Col      int
+	StyleCB  func(v string, err string, selected bool, cur lipgloss.Style) lipgloss.Style
 }
 
 type Model struct {
@@ -24,6 +29,7 @@ type Model struct {
 	focusedField int
 	dataFields   []*DataField
 	inpFields    []textinput.Model
+	layout       [][]int
 
 	popupVisible bool
 	popupOnNo    bool
@@ -34,6 +40,30 @@ type Model struct {
 
 func New(w int, id string, dataFields []*DataField, createFunc func() (string, error), updateFunc, delFunc func(id string) error, mods ...FieldsMod) *Model {
 	inpFields := make([]textinput.Model, len(dataFields))
+
+	highestRow := 0
+	for _, d := range dataFields {
+		if d.Row < 0 || d.Col < 0 {
+			panic("Row or col can't be <= 0!")
+		}
+
+		if d.Row > highestRow {
+			highestRow = d.Row
+		}
+	}
+
+	highestCol := make([]int, highestRow + 1)
+	for _, d := range dataFields {
+		if d.Col > highestCol[d.Row] {
+			highestCol[d.Row] = d.Col
+		}
+	}
+
+	layout := make([][]int, highestRow + 1)
+	for i, v := range highestCol {
+		layout[i] = make([]int, v + 1)
+	}
+
 	for i, d := range dataFields {
 		f := textinput.New()
 		f.Prompt = ""
@@ -42,7 +72,28 @@ func New(w int, id string, dataFields []*DataField, createFunc func() (string, e
 		f.Placeholder = d.Title
 
 		inpFields[i] = f
+
+		if layout[d.Row][d.Col] != 0 {
+			panic(fmt.Sprintf("Overlap at y=%v, x=%v", d.Row, d.Col))
+		}
+
+		// + 1 so that unset detection is simpler :3
+		layout[d.Row][d.Col] = i + 1
 	}
+
+	for y, r := range layout {
+		if len(r) == 0 {
+			panic(fmt.Sprintf("Empty row at y=%v", y))
+		}
+		for x, v := range r {
+			if v == 0 {
+				panic(fmt.Sprintf("Value not set at y=%v, x=%v", y, x))
+			}
+			r[x]--
+		}
+	}
+
+	layout = append(layout, []int{-1, -2, -3})
 
 	for _, m := range mods {
 		m(inpFields)
@@ -52,15 +103,21 @@ func New(w int, id string, dataFields []*DataField, createFunc func() (string, e
 		inpFields[i].SetValue(*f.Value)
 	}
 
-	return &Model{
+	m := &Model{
 		width:      w,
 		ItemID:     id,
 		dataFields: dataFields,
 		inpFields:  inpFields,
 		create:     createFunc,
 		update:     updateFunc,
-		del: delFunc,
+		layout:     layout,
+		del:        delFunc,
 	}
+
+	// For future field growth support
+	m.SetWidth(w)
+
+	return m
 }
 
 func (c *Model) Init() tea.Cmd {
@@ -91,34 +148,6 @@ func (c *Model) save() (tea.Msg, error) {
 	return ItemUpdate(c.ItemID), nil
 }
 
-func (c *Model) focusField(f int) tea.Cmd {
-	if !c.inButtons(c.focusedField) {
-		c.inpFields[c.focusedField].Blur()
-	}
-	c.focusedField = f
-	if c.inButtons(c.focusedField) {
-		return nil
-	}
-
-	return c.inpFields[c.focusedField].Focus()
-}
-
-func (c *Model) incFocusField(d int) tea.Cmd {
-	nf := c.focusedField + d
-
-	if nf < 0 {
-		// focus on the left button (save) in case of overflow to the minus
-		return c.focusField(len(c.inpFields))
-	} else if nf > len(c.inpFields)+2 {
-		return c.focusField(0)
-	}
-
-	return c.focusField(c.focusedField + d)
-}
-
-func (c Model) inButtons(i int) bool {
-	return i >= len(c.inpFields)
-}
 
 func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -141,33 +170,19 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 				break
 			}
 
-			var dir int
-			switch msg.String() {
-			case "right", "tab", "down":
-				dir = 1
-			case "left", "shift+tab", "up":
-				dir = -1
-			}
-
-			if c.inButtons(c.focusedField) && (msg.String() == "down" || msg.String() == "up") {
-				// in buttons, a up/down key should yield "get out of the button row"
-				if msg.String() == "down" {
-					batcher = append(batcher, c.focusField(0))
-				} else {
-					batcher = append(batcher, c.focusField(len(c.inpFields)-1))
-				}
-			} else if !c.inButtons(c.focusedField) && (msg.String() == "left" || msg.String() == "right") {
+			handled, nf := c.handleNavKey(msg.String())
+			if !handled {
 				passToChildren = true
 			} else {
-				batcher = append(batcher, c.incFocusField(dir))
+				batcher = append(batcher, c.focusField(nf))
 			}
 		case "enter":
 			passToChildren = false
 			switch c.focusedField {
-			case len(c.inpFields):
+			case -1:
 				// save
 				batcher = append(batcher, c.handleSaveEnter())
-			case len(c.inpFields) + 1:
+			case -2:
 				// delete
 				err := c.del(c.ItemID)
 				if err != nil {
@@ -175,7 +190,7 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 					panic("Can't delete: " + err.Error())
 				}
 				batcher = append(batcher, func() tea.Msg { return ItemDel(c.ItemID) })
-			case len(c.inpFields) + 2:
+			case -3:
 				// reset
 				c.focusField(0)
 				for i, d := range c.dataFields {
@@ -192,7 +207,10 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 				continue
 			}
 
-			c.dataFields[i].apiErr = v[1]
+			if len(c.layout[c.dataFields[i].Row]) != 1 {
+				c.inpFields[i].SetValue("")
+			}
+			c.inpFields[i].Err = APIErr(v[1])
 		}
 	}
 
@@ -212,7 +230,6 @@ func (c *Model) SetWidth(w int) {
 
 type validationErrMsg [][2]string
 
-// TODO: Implement locking mechanism so that this op doesn't block the entire app
 func (c *Model) handleSaveEnter() tea.Cmd {
 	if utils.Any(slices.Values(c.inpFields), func(v textinput.Model) bool { return v.Err != nil }) {
 		return nil
@@ -220,7 +237,6 @@ func (c *Model) handleSaveEnter() tea.Cmd {
 
 	for i, f := range c.inpFields {
 		*c.dataFields[i].Value = f.Value()
-		c.dataFields[i].apiErr = ""
 	}
 
 	return func() tea.Msg {

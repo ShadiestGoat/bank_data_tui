@@ -205,3 +205,7 @@ type APIClient struct {
 func (a *APIClient) Login(userAndPass [2]string) error {
 	return loginIntoClient(a, userAndPass)
 }
+
+type RespCreated struct {
+	ID string `json:"id"`
+}
