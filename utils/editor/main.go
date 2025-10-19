@@ -185,6 +185,15 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 				batcher = append(batcher, c.focusField(c.focusedField+1))
 			}
 		}
+	case validationErrMsg:
+		for _, v := range msg {
+			i := slices.IndexFunc(c.dataFields, func(f *DataField) bool { return f.ID == v[0] })
+			if i == -1 {
+				continue
+			}
+
+			c.dataFields[i].apiErr = v[1]
+		}
 	}
 
 	if passToChildren {
@@ -201,6 +210,8 @@ func (c *Model) SetWidth(w int) {
 	c.width = w
 }
 
+type validationErrMsg [][2]string
+
 // TODO: Implement locking mechanism so that this op doesn't block the entire app
 func (c *Model) handleSaveEnter() tea.Cmd {
 	if utils.Any(slices.Values(c.inpFields), func(v textinput.Model) bool { return v.Err != nil }) {
@@ -212,27 +223,16 @@ func (c *Model) handleSaveEnter() tea.Cmd {
 		c.dataFields[i].apiErr = ""
 	}
 
-	msg, err := c.save()
-	if err == nil {
-		if msg != nil {
-			return func() tea.Msg { return msg }
+	return func() tea.Msg {
+		msg, err := c.save()
+		if err == nil {
+			return msg
 		}
 
-		return nil
-	}
-
-	if e, ok := err.(*api.ValidationErr); !ok {
-		panic(err)
-	} else {
-		for _, v := range e.Details {
-			i := slices.IndexFunc(c.dataFields, func(f *DataField) bool { return f.ID == v[0] })
-			if i == -1 {
-				continue
-			}
-
-			c.dataFields[i].apiErr = v[1]
+		if e, ok := err.(*api.ValidationErr); !ok {
+			panic(err)
+		} else {
+			return validationErrMsg(e.Details)
 		}
 	}
-
-	return nil
 }

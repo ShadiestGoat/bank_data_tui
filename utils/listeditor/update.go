@@ -1,7 +1,6 @@
 package listeditor
 
 import (
-	"log"
 	"slices"
 
 	"github.com/bank_data_tui/utils/editor"
@@ -62,7 +61,6 @@ func (m *Model[T, PT]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	i := m.list.GlobalIndex()
-	log.Println("GI", i, len(m.items))
 	if m.isNewCategory(i) {
 		if m.curItem.GetID() != "" {
 			m.curItem = new(T)
