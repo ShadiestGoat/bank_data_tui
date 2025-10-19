@@ -21,7 +21,7 @@ func (m *mainApp) switchToScreen(s Screen) tea.Cmd {
 	case S_TRANS:
 		m.screenImp = &transactions.Model{}
 	case S_MAPPINGS:
-		m.screenImp = &mappings.Model{}
+		m.screenImp = mappings.New(m.api, m.width, m.height - HEADER_HEIGHT)
 	case S_CATEGORIES:
 		m.screenImp = categories.New(m.api, m.width, m.height-HEADER_HEIGHT)
 	case S_UPLOAD:
@@ -41,13 +41,13 @@ func (m *mainApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
-		case "alt+tab", "alt+right":
+		case "alt+tab":
 			s := m.curFocusedScreen + 1
 			if s > S_UPLOAD {
 				s = S_TRANS
 			}
 			batcher = append(batcher, m.switchToScreen(s))
-		case "alt+shift+tab", "alt+left":
+		case "alt+shift+tab":
 			s := m.curFocusedScreen - 1
 			if s == S_LOGIN {
 				s = S_UPLOAD
