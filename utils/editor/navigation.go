@@ -33,6 +33,13 @@ func (c Model) inButtons(i int) bool {
 func (c Model) handleNavKey(key string) (bool, int) {
 	switch key {
 	case "tab":
+		if !c.inButtons(c.focusedField) {
+			sug := c.inpFields[c.focusedField].CurrentSuggestion()
+			if sug != "" && sug != c.inpFields[c.focusedField].Value() {
+				return false, 0
+			}
+		}
+
 		return true, c.navKeyHorizontal(1)
 	case "shift+tab":
 		return true, c.navKeyHorizontal(-1)
@@ -79,7 +86,19 @@ func (c Model) navKeyHorizontal(dir int) int {
 		return c.layout[cy][cx + dir]
 	}
 
-	return c.navKeyVertical(dir)
+	if cy + dir < 0 {
+		row := len(c.layout) - 1
+		return c.layout[row][len(c.layout[row]) - 1]
+	} else if cy + dir >= len(c.layout) {
+		return c.layout[0][0]
+	}
+	
+	row := cy + dir
+	if dir < 0 {
+		return c.layout[row][len(c.layout[row]) - 1]
+	}
+
+	return c.layout[row][0]
 }
 
 func (c Model) navKeyVertical(dir int) int {
@@ -95,12 +114,15 @@ func (c Model) navKeyVertical(dir int) int {
 	curPerc := float64(cx)/float64(len(c.layout[cy]))
 	nextLen := float64(len(c.layout[cy + dir]))
 	for i := range c.layout[cy + dir] {
-		if curPerc >= float64(i)/nextLen {
+		p := float64(i)/nextLen
+		if curPerc == p {
+			return c.layout[cy + dir][i]
+		}
+
+		if curPerc < float64(i)/nextLen {
 			return c.layout[cy + dir][max(i - 1, 0)]
 		}
 	}
 
-	panic("Meow")
-
-	return 0
+	return c.layout[cy + dir][len(c.layout[cy + dir]) - 1]
 }
