@@ -1,7 +1,9 @@
 package editor
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"slices"
 
 	"github.com/bank_data_tui/api"
@@ -12,13 +14,18 @@ import (
 )
 
 type DataField struct {
-	Title  string
-	Value  *string
-	ID     string
+	Title string
+	ID    string
 
-	Row      int
-	Col      int
-	StyleCB  func(v string, err string, selected bool, cur lipgloss.Style) lipgloss.Style
+	Row int
+	Col int
+
+	Value    *string
+	GetValue func() string
+	SetValue func(v string)
+
+	Flex    bool
+	StyleCB func(v string, err error, selected bool, cur lipgloss.Style) lipgloss.Style
 }
 
 type Model struct {
@@ -46,22 +53,25 @@ func New(w int, id string, dataFields []*DataField, createFunc func() (string, e
 		if d.Row < 0 || d.Col < 0 {
 			panic("Row or col can't be <= 0!")
 		}
+		if d.Value == nil && (d.GetValue == nil || d.SetValue == nil) {
+			panic("Data Field must have at least 1 field get/set method")
+		}
 
 		if d.Row > highestRow {
 			highestRow = d.Row
 		}
 	}
 
-	highestCol := make([]int, highestRow + 1)
+	highestCol := make([]int, highestRow+1)
 	for _, d := range dataFields {
 		if d.Col > highestCol[d.Row] {
 			highestCol[d.Row] = d.Col
 		}
 	}
 
-	layout := make([][]int, highestRow + 1)
+	layout := make([][]int, highestRow+1)
 	for i, v := range highestCol {
-		layout[i] = make([]int, v + 1)
+		layout[i] = make([]int, v+1)
 	}
 
 	for i, d := range dataFields {
@@ -70,6 +80,8 @@ func New(w int, id string, dataFields []*DataField, createFunc func() (string, e
 		f.Blur()
 		f.Width = 15
 		f.Placeholder = d.Title
+		f.KeyMap.NextSuggestion.SetKeys("ctrl+n")
+		f.KeyMap.PrevSuggestion.SetKeys("ctrl+p")
 
 		inpFields[i] = f
 
@@ -93,14 +105,16 @@ func New(w int, id string, dataFields []*DataField, createFunc func() (string, e
 		}
 	}
 
-	layout = append(layout, []int{-1, -2, -3})
-
 	for _, m := range mods {
 		m(inpFields)
 	}
 
 	for i, f := range dataFields {
-		inpFields[i].SetValue(*f.Value)
+		if f.Value == nil {
+			inpFields[i].SetValue(f.GetValue())
+		} else {
+			inpFields[i].SetValue(*f.Value)
+		}
 	}
 
 	m := &Model{
@@ -114,8 +128,8 @@ func New(w int, id string, dataFields []*DataField, createFunc func() (string, e
 		del:        delFunc,
 	}
 
-	// For future field growth support
 	m.SetWidth(w)
+	m.resetButtonLayout()
 
 	return m
 }
@@ -138,6 +152,7 @@ func (c *Model) save() (tea.Msg, error) {
 		}
 
 		c.ItemID = id
+		c.resetButtonLayout()
 		return ItemNew(id), nil
 	}
 
@@ -147,7 +162,6 @@ func (c *Model) save() (tea.Msg, error) {
 	}
 	return ItemUpdate(c.ItemID), nil
 }
-
 
 func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -179,10 +193,10 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 		case "enter":
 			passToChildren = false
 			switch c.focusedField {
-			case -1:
+			case BTN_SAVE:
 				// save
 				batcher = append(batcher, c.handleSaveEnter())
-			case -2:
+			case BTN_DEL:
 				// delete
 				err := c.del(c.ItemID)
 				if err != nil {
@@ -190,11 +204,15 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 					panic("Can't delete: " + err.Error())
 				}
 				batcher = append(batcher, func() tea.Msg { return ItemDel(c.ItemID) })
-			case -3:
+			case BTN_RESET:
 				// reset
-				c.focusField(0)
+				c.focusField(c.layout[0][0])
 				for i, d := range c.dataFields {
-					c.inpFields[i].SetValue(*d.Value)
+					if d.Value == nil {
+						c.inpFields[i].SetValue(d.GetValue())
+					} else {
+						c.inpFields[i].SetValue(*d.Value)
+					}
 				}
 			default:
 				batcher = append(batcher, c.focusField(c.focusedField+1))
@@ -219,6 +237,15 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 			c.inpFields[i], cmd = f.Update(msg)
 			batcher = append(batcher, cmd)
 		}
+		if _, ok := msg.(tea.KeyMsg); ok {
+			for i, f := range c.inpFields {
+				// re-validate cause some validators need to be triggered external events
+				if errors.Is(f.Err, APIErr("")) {
+					continue
+				}
+				c.inpFields[i].Err = f.Validate(f.Value())
+			}
+		}
 	}
 
 	return c, tea.Batch(batcher...)
@@ -226,6 +253,50 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 
 func (c *Model) SetWidth(w int) {
 	c.width = w
+	log.Println("WIDTH", w)
+
+	for _, row := range c.layout {
+		if row[0] < 0 {
+			continue
+		}
+
+		// -len(row) + 1 = space between each item
+		// -len(row) = each item has an extra space aside from width
+		// fuck you textinput component >:(
+		availWidth := w - len(row) + 1 - len(row)
+		flexers := 0
+
+		for _, i := range row {
+			f := c.dataFields[i]
+			availWidth -= extraFieldLength(&c.inpFields[i], f)
+
+			if f.Flex {
+				flexers++
+			} else {
+				availWidth -= c.inpFields[i].Width
+			}
+		}
+
+		if flexers == 0 {
+			continue
+		}
+
+		extraSpaceEvery := availWidth % flexers
+		spaceBuf := 0
+
+		for _, i := range row {
+			if !c.dataFields[i].Flex {
+				continue
+			}
+			c.inpFields[i].Width = availWidth / flexers
+			if extraSpaceEvery != 0 && spaceBuf == extraSpaceEvery {
+				c.inpFields[i].Width += 1
+				spaceBuf = 0
+			} else {
+				spaceBuf++
+			}
+		}
+	}
 }
 
 type validationErrMsg [][2]string
@@ -236,7 +307,12 @@ func (c *Model) handleSaveEnter() tea.Cmd {
 	}
 
 	for i, f := range c.inpFields {
-		*c.dataFields[i].Value = f.Value()
+		d := c.dataFields[i]
+		if d.Value == nil {
+			d.SetValue(f.Value())
+		} else {
+			*d.Value = f.Value()
+		}
 	}
 
 	return func() tea.Msg {
@@ -250,5 +326,27 @@ func (c *Model) handleSaveEnter() tea.Cmd {
 		} else {
 			return validationErrMsg(e.Details)
 		}
+	}
+}
+
+const (
+	BTN_SAVE  = -1
+	BTN_DEL   = -2
+	BTN_RESET = -3
+)
+
+func (c *Model) resetButtonLayout() {
+	y := len(c.layout) - 1
+	var l []int
+	if c.ItemID == "" {
+		l = []int{BTN_SAVE, BTN_RESET}
+	} else {
+		l = []int{BTN_SAVE, BTN_DEL, BTN_RESET}
+	}
+
+	if c.layout[y][0] < 0 {
+		c.layout[y] = l
+	} else {
+		c.layout = append(c.layout, l)
 	}
 }

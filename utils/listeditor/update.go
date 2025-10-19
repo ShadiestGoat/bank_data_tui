@@ -38,6 +38,11 @@ func (m *Model[T, PT]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			bubble = false
 			m.list.CursorDown()
 		}
+	case AbstractionSetup:
+		a, ok := m.Abstraction.(interface {Setup(msg AbstractionSetup)})
+		if ok {
+			a.Setup(msg)
+		}
 	}
 
 	if !m.isLoaded {

@@ -51,8 +51,8 @@ func (c *categoryImpl) NewEditor(w, h int, v *categoryProxy) *editor.Model {
 				ID:    "color",
 				Value: &v.Color,
 				Row: 1,
-				StyleCB: func(v, err string, selected bool, cur lipgloss.Style) lipgloss.Style {
-					if !selected || err != "" {
+				StyleCB: func(v string, err error, selected bool, cur lipgloss.Style) lipgloss.Style {
+					if !selected || err != nil {
 						return cur
 					}
 

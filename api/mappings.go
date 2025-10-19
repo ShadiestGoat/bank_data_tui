@@ -4,11 +4,11 @@ type Mapping struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name"`
 
-	InpText *string  `json:"inputText,omitempty"`
+	InpText string  `json:"inputText,omitempty"`
 	InpAmt  *float64 `json:"inputAmount,omitempty"`
 
-	ResName       *string `json:"resName,omitempty"`
-	ResCategoryID *string `json:"resCategoryID,omitempty"`
+	ResName       string `json:"resName,omitempty"`
+	ResCategoryID string `json:"resCategoryID,omitempty"`
 
 	Priority int `json:"priority"`
 }

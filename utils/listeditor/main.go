@@ -76,11 +76,12 @@ func New[T any, PT interface {
 }
 
 type initialResp[T any] []T
+type AbstractionSetup struct {V any}
 
 func (m *Model[T, PT]) Init() tea.Cmd {
 	m.resetEditor()
 
-	return tea.Batch(
+	batcher := []tea.Cmd{
 		func() tea.Msg {
 			res, err := m.InitialFetch()
 			if err != nil {
@@ -91,7 +92,15 @@ func (m *Model[T, PT]) Init() tea.Cmd {
 		},
 		m.spin.Tick,
 		m.editor.Init(),
-	)
+	}
+
+	if a, ok := m.Abstraction.(interface {Init() AbstractionSetup}); ok {
+		batcher = append(batcher, func() tea.Msg {
+			return a.Init()
+		})
+	}
+
+	return tea.Batch(batcher...)
 }
 
 func (m Model[T, PT]) View() string {
