@@ -86,7 +86,7 @@ func (c *mappingImpl) NewEditor(w, h int, v *mappingProxy) *editor.Model {
 			{
 				Title: "Resulting Name",
 				ID:    "resName",
-				Value: &v.InpText,
+				Value: &v.ResName,
 				Row:   2,
 				Flex:  true,
 			},
@@ -126,14 +126,14 @@ func (c *mappingImpl) NewEditor(w, h int, v *mappingProxy) *editor.Model {
 				Flex: true,
 			},
 		},
-		func() (string, error) {
-			id, err := c.api.MappingsCreate((*api.Mapping)(v))
+		func(alt bool) (string, error) {
+			id, err := c.api.MappingsCreate((*api.Mapping)(v), alt)
 			if err != nil {
 				return "", err
 			}
 			return id, nil
 		},
-		func(id string) error { panic("unimplemented") },
+		func(_ bool, id string) error { panic("unimplemented") },
 		func(id string) error { panic("unimplemented") },
 		editor.RequireFields(0),
 		editor.AddIntValidator(1),

@@ -41,11 +41,12 @@ type Model struct {
 	popupVisible bool
 	popupOnNo    bool
 
-	create      func() (string, error)
-	update, del func(id string) error
+	create func(alt bool) (string, error)
+	update func(alt bool, id string) error
+	del    func(id string) error
 }
 
-func New(w int, id string, dataFields []*DataField, createFunc func() (string, error), updateFunc, delFunc func(id string) error, mods ...FieldsMod) *Model {
+func New(w int, id string, dataFields []*DataField, createFunc func(alt bool) (string, error), updateFunc func(alt bool, id string) error, delFunc func(id string) error, mods ...FieldsMod) *Model {
 	inpFields := make([]textinput.Model, len(dataFields))
 
 	highestRow := 0
@@ -144,9 +145,9 @@ type ItemNew string
 type ItemUpdate string
 type ItemDel string
 
-func (c *Model) save() (tea.Msg, error) {
+func (c *Model) save(alt bool) (tea.Msg, error) {
 	if c.ItemID == "" {
-		id, err := c.create()
+		id, err := c.create(alt)
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +157,7 @@ func (c *Model) save() (tea.Msg, error) {
 		return ItemNew(id), nil
 	}
 
-	err := c.update(c.ItemID)
+	err := c.update(alt, c.ItemID)
 	if err != nil {
 		return nil, err
 	}
@@ -190,12 +191,17 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 			} else {
 				batcher = append(batcher, c.focusField(nf))
 			}
+		case "alt+enter":
+			if c.focusedField == BTN_SAVE {
+				passToChildren = false
+				batcher = append(batcher, c.handleSaveEnter(true))
+			}
 		case "enter":
 			passToChildren = false
 			switch c.focusedField {
 			case BTN_SAVE:
 				// save
-				batcher = append(batcher, c.handleSaveEnter())
+				batcher = append(batcher, c.handleSaveEnter(false))
 			case BTN_DEL:
 				// delete
 				err := c.del(c.ItemID)
@@ -301,7 +307,7 @@ func (c *Model) SetWidth(w int) {
 
 type validationErrMsg [][2]string
 
-func (c *Model) handleSaveEnter() tea.Cmd {
+func (c *Model) handleSaveEnter(alt bool) tea.Cmd {
 	if utils.Any(slices.Values(c.inpFields), func(v textinput.Model) bool { return v.Err != nil }) {
 		return nil
 	}
@@ -316,7 +322,7 @@ func (c *Model) handleSaveEnter() tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		msg, err := c.save()
+		msg, err := c.save(alt)
 		if err == nil {
 			return msg
 		}

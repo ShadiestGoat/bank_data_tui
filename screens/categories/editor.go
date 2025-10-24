@@ -66,14 +66,14 @@ func (c *categoryImpl) NewEditor(w, h int, v *categoryProxy) *editor.Model {
 				Row: 2,
 			},
 		},
-		func() (string, error) {
+		func(_ bool) (string, error) {
 			id, err := c.api.CategoriesCreate(&v.SavableCategory)
 			if err != nil {
 				return "", err
 			}
 			return id, nil
 		},
-		func(id string) error { return c.api.CategoriesUpdate(id, &v.SavableCategory) },
+		func(_ bool, id string) error { return c.api.CategoriesUpdate(id, &v.SavableCategory) },
 		func(id string) error { return c.api.CategoriesDelete(id) },
 		editor.RequireFields(0, 1, 2),
 		editor.AddFieldValidator(1, func(s string) error {

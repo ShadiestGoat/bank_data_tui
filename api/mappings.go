@@ -17,8 +17,13 @@ func (c *APIClient) MappingsFetch() ([]*Mapping, error) {
 	return deArray(easyFetch[[]*Mapping](c, `GET`, `/mappings`, nil))
 }
 
-func (c *APIClient) MappingsCreate(s *Mapping) (string, error) {
-	resp, err := easyFetch[RespCreated](c, `POST`, `/mappings`, s)
+func (c *APIClient) MappingsCreate(s *Mapping, noRetroactive bool) (string, error) {
+	q := ""
+	if noRetroactive {
+		q += "?no_retroactive=1"
+	}
+
+	resp, err := easyFetch[RespCreated](c, `POST`, `/mappings` + q, s)
 	if err != nil {
 		return "", err
 	}
