@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/screens/login"
+	"github.com/bank_data_tui/utils/repo"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/joho/godotenv"
 )
@@ -27,7 +29,8 @@ type mainApp struct {
 	width  int
 	height int
 
-	api *api.APIClient
+	cache *repo.Cache
+	api   *api.APIClient
 }
 
 func (m mainApp) Init() tea.Cmd {
@@ -47,6 +50,7 @@ func main() {
 		curFocusedScreen: S_LOGIN,
 		screenImp:        login.NewScreenLogin(),
 		api:              &api.APIClient{},
+		cache:            &repo.Cache{},
 	}
 	user, pass := os.Getenv("USERNAME"), os.Getenv("PASSWORD")
 
@@ -60,6 +64,6 @@ func main() {
 
 	p := tea.NewProgram(app, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
-		panic("Shit fuck shit: " + err.Error())
+		fmt.Println(err)
 	}
 }

@@ -97,14 +97,14 @@ func (c *mappingImpl) NewEditor(w, h int, v *mappingProxy) *editor.Model {
 					if v.ResCategoryID == "" {
 						return ""
 					}
-					i := slices.IndexFunc(c.fetchedCategories, func(c *api.Category) bool {
+					i := slices.IndexFunc(c.cache.Categories, func(c *api.Category) bool {
 						return c.ID == v.ResCategoryID
 					})
 					if i == -1 {
 						return ""
 					}
 
-					return c.fetchedCategories[i].Name
+					return c.cache.Categories[i].Name
 				},
 				SetValue: func(raw string) {
 					if raw == "" {
@@ -112,7 +112,7 @@ func (c *mappingImpl) NewEditor(w, h int, v *mappingProxy) *editor.Model {
 						return
 					}
 
-					for _, c := range c.fetchedCategories {
+					for _, c := range c.cache.Categories {
 						if c.Name == raw {
 							v.ResCategoryID = c.ID
 							return
@@ -154,7 +154,7 @@ func (c *mappingImpl) NewEditor(w, h int, v *mappingProxy) *editor.Model {
 				return nil
 			}
 
-			for _, c := range c.fetchedCategories {
+			for _, c := range c.cache.Categories {
 				if s == c.Name {
 					return nil
 				}
@@ -165,6 +165,7 @@ func (c *mappingImpl) NewEditor(w, h int, v *mappingProxy) *editor.Model {
 		func(fields []textinput.Model) {
 			fields[5].ShowSuggestions = true
 			c.categoryField = &fields[5]
+			c.resetSuggestions()
 		},
 		editor.AddOneOfRequirement("matcher", 2, 3),
 		editor.AddOneOfRequirement("result", 4, 5),

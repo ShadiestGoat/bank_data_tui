@@ -19,13 +19,13 @@ func (m *mainApp) switchToScreen(s Screen) tea.Cmd {
 	m.curFocusedScreen = s
 	switch s {
 	case S_TRANS:
-		m.screenImp = &transactions.Model{}
+		m.screenImp = transactions.New(m.api, m.cache, m.width, m.height-HEADER_HEIGHT)
 	case S_MAPPINGS:
-		m.screenImp = mappings.New(m.api, m.width, m.height - HEADER_HEIGHT)
+		m.screenImp = mappings.New(m.api, m.cache, m.width, m.height-HEADER_HEIGHT)
 	case S_CATEGORIES:
-		m.screenImp = categories.New(m.api, m.width, m.height-HEADER_HEIGHT)
+		m.screenImp = categories.New(m.api, m.cache, m.width, m.height-HEADER_HEIGHT)
 	case S_UPLOAD:
-		m.screenImp = &upload.Model{}
+		m.screenImp = upload.New(m.api, m.width, m.height-HEADER_HEIGHT)
 	}
 
 	return m.screenImp.Init()
@@ -84,6 +84,8 @@ func (m *mainApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			batcher = append(batcher, m.switchToScreen(S_TRANS))
 		}
+	case upload.FileUploadComplete:
+		batcher = append(batcher, m.switchToScreen(S_TRANS))
 	default:
 		passToChildren = true
 	}

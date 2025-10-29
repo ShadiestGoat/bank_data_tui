@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -33,8 +34,8 @@ func (a APIErr) Error() string {
 }
 
 type StdAPIError struct {
-	Status int
-	Message string `json:"error"`
+	Status  int
+	Message string   `json:"error"`
 	Details []string `json:"details"`
 }
 
@@ -63,13 +64,20 @@ func (ValidationErr) Error() string {
 }
 
 func fetch[T any](method, path string, body any, authHeader string) (*T, error) {
-	inpBuf := &bytes.Buffer{}
-	err := json.NewEncoder(inpBuf).Encode(body)
-	if err != nil {
-		return nil, err
+	var inp io.Reader
+	if b, ok := body.(io.ReadSeeker); ok {
+		b.Seek(0, io.SeekStart)
+		inp = b
+	} else {
+		inpBuf := &bytes.Buffer{}
+		err := json.NewEncoder(inpBuf).Encode(body)
+		if err != nil {
+			return nil, err
+		}
+		inp = inpBuf
 	}
 
-	req, err := http.NewRequest(method, API_BASE_URL+path, inpBuf)
+	req, err := http.NewRequest(method, API_BASE_URL+path, inp)
 	if err != nil {
 		return nil, err
 	}
@@ -86,6 +94,9 @@ func fetch[T any](method, path string, body any, authHeader string) (*T, error) 
 	}
 
 	if resp.StatusCode != 200 && resp.StatusCode != 204 {
+		defer func() {
+			log.Printf("Bad status code '%d'", resp.StatusCode)
+		}()
 		d, _ := io.ReadAll(resp.Body)
 		std := &StdAPIError{Status: resp.StatusCode}
 		if err := json.Unmarshal(d, std); err != nil {
@@ -208,4 +219,9 @@ func (a *APIClient) Login(userAndPass [2]string) error {
 
 type RespCreated struct {
 	ID string `json:"id"`
+}
+
+type RespPages[T any] struct {
+	Total int `json:"total"`
+	Data  T   `json:"data"`
 }

@@ -8,6 +8,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+type ItemNew struct{ Value any }
+type ItemUpdate struct{ Value any }
+
 func (m *Model[T, PT]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	batcher := []tea.Cmd{}
 	var cmd tea.Cmd
@@ -23,12 +26,19 @@ func (m *Model[T, PT]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.curItem.SetID(string(msg))
 		m.items = append(m.items, m.curItem)
 		batcher = append(batcher, m.list.SetItems(m.categoryItems()))
+		batcher = append(batcher, func() tea.Msg {
+			return ItemNew{Value: m.curItem}
+		})
 	case editor.ItemDel:
 		i := slices.IndexFunc(m.items, func(c PT) bool { return c.GetID() == string(msg) })
 		if i != -1 {
 			m.items = slices.Delete(m.items, i, i+1)
 		}
 		batcher = append(batcher, m.list.SetItems(m.categoryItems()))
+	case editor.ItemUpdate:
+		batcher = append(batcher, func() tea.Msg {
+			return ItemUpdate{Value: m.curItem}
+		})
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "alt+up":
@@ -38,16 +48,15 @@ func (m *Model[T, PT]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			bubble = false
 			m.list.CursorDown()
 		}
-	case AbstractionSetup:
-		a, ok := m.Abstraction.(interface {Setup(msg AbstractionSetup)})
-		if ok {
-			a.Setup(msg)
-		}
 	}
 
 	if !m.isLoaded {
 		m.spin, cmd = m.spin.Update(msg)
 		batcher = append(batcher, cmd)
+	}
+
+	if a, ok := m.Abstraction.(interface{ Update(msg tea.Msg) }); ok {
+		a.Update(msg)
 	}
 
 	if bubble {
