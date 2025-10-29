@@ -2,6 +2,7 @@ package editor
 
 import (
 	"slices"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -35,7 +36,7 @@ func (c Model) handleNavKey(key string) (bool, int) {
 	case "tab":
 		if !c.inButtons(c.focusedField) {
 			sug := c.inpFields[c.focusedField].CurrentSuggestion()
-			if sug != "" && sug != c.inpFields[c.focusedField].Value() {
+			if sug != "" && !strings.EqualFold(c.inpFields[c.focusedField].Value(), sug) {
 				return false, 0
 			}
 		}

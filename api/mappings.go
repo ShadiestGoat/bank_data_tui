@@ -31,10 +31,20 @@ func (c *APIClient) MappingsCreate(s *Mapping, noRetroactive bool) (string, erro
 	return resp.ID, nil
 }
 
-// func (c *APIClient) MappingsUpdate(id string, s *Mapping) error {
-// 	return easyNilFetch(c, `PUT`, `/mappings/` + id, s)
-// }
+func (c *APIClient) MappingsUpdate(id string, s *Mapping, noRetroactive bool) error {
+	q := ""
+	if noRetroactive {
+		q += "?no_retroactive=1"
+	}
 
-// func (c *APIClient) MappingsDelete(id string) error {
-// 	return easyNilFetch(c, `DELETE`, `/mappings/` + id, nil)
-// }
+	return easyNilFetch(c, `PUT`, `/mappings/` + id + q, s)
+}
+
+func (c *APIClient) MappingsDelete(id string, noRetroactive bool) error {
+	q := ""
+	if noRetroactive {
+		q += "?no_retroactive=1"
+	}
+
+	return easyNilFetch(c, `DELETE`, `/mappings/` + id + q, nil)
+}

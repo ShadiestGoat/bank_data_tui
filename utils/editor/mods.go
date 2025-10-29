@@ -2,6 +2,7 @@ package editor
 
 import (
 	"fmt"
+	"log"
 	"slices"
 	"strconv"
 
@@ -38,16 +39,16 @@ func (a APIErr) Is(err error) bool {
 	return ok
 }
 
-type FieldsMod func(fields []textinput.Model)
+type FieldsMod func(fields []*textinput.Model)
 
-func ModifyField(i int, mod func(f textinput.Model) textinput.Model) FieldsMod {
-	return func(fields []textinput.Model) {
+func ModifyField(i int, mod func(f *textinput.Model) *textinput.Model) FieldsMod {
+	return func(fields []*textinput.Model) {
 		fields[i] = mod(fields[i])
 	}
 }
 
 func RequireFields(is ...int) FieldsMod {
-	return func(fields []textinput.Model) {
+	return func(fields []*textinput.Model) {
 		for i := range is {
 			AddFieldValidator(i, func(s string) error {
 				if s == "" {
@@ -61,7 +62,7 @@ func RequireFields(is ...int) FieldsMod {
 }
 
 func AddFieldValidator(i int, validate func(s string) error) FieldsMod {
-	return func(fields []textinput.Model) {
+	return func(fields []*textinput.Model) {
 		og := fields[i].Validate
 		fields[i].Validate = func(s string) error {
 			if og != nil {
@@ -75,11 +76,13 @@ func AddFieldValidator(i int, validate func(s string) error) FieldsMod {
 	}
 }
 
-func fieldValues(is []int, fields []textinput.Model) []string {
+func fieldValues(is []int, fields []*textinput.Model) []string {
 	res := make([]string, len(is))
 	for i, fi := range is {
 		res[i] = fields[fi].Value()
 	}
+
+	log.Println(res)
 
 	return res
 }
@@ -95,7 +98,7 @@ func AddOneOfRequirement(fieldType string, is ...int) FieldsMod {
 }
 
 func AddMultiFieldValidator(validate func (s []string) error, is ...int) FieldsMod {
-	return func(fields []textinput.Model) {
+	return func(fields []*textinput.Model) {
 		for _, i := range is {
 			og := fields[i].Validate
 			fields[i].Validate = func(s string) error {
@@ -112,7 +115,7 @@ func AddMultiFieldValidator(validate func (s []string) error, is ...int) FieldsM
 }
 
 func AddIntValidator(is ...int) FieldsMod {
-	return func(fields []textinput.Model) {
+	return func(fields []*textinput.Model) {
 		for _, i := range is {
 			AddFieldValidator(i, func(s string) error {
 				if s != "" {
@@ -129,7 +132,7 @@ func AddIntValidator(is ...int) FieldsMod {
 }
 
 func AddFloatValidator(is ...int) FieldsMod {
-	return func(fields []textinput.Model) {
+	return func(fields []*textinput.Model) {
 		for _, i := range is {
 			AddFieldValidator(i, func(s string) error {
 				if s != "" {

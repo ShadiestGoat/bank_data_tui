@@ -43,10 +43,17 @@ type Model struct {
 
 	create func(alt bool) (string, error)
 	update func(alt bool, id string) error
-	del    func(id string) error
+	del    func(alt bool, id string) error
 }
 
-func New(w int, id string, dataFields []*DataField, createFunc func(alt bool) (string, error), updateFunc func(alt bool, id string) error, delFunc func(id string) error, mods ...FieldsMod) *Model {
+func New(
+	w int, id string,
+	dataFields []*DataField,
+	createFunc func(alt bool) (string, error),
+	updateFunc func(alt bool, id string) error,
+	delFunc func(alt bool, id string) error,
+	mods ...FieldsMod,
+) *Model {
 	inpFields := make([]textinput.Model, len(dataFields))
 
 	highestRow := 0
@@ -106,8 +113,13 @@ func New(w int, id string, dataFields []*DataField, createFunc func(alt bool) (s
 		}
 	}
 
+	ptr := make([]*textinput.Model, len(inpFields))
+	for i := range inpFields {
+		ptr[i] = &inpFields[i]
+	}
+
 	for _, m := range mods {
-		m(inpFields)
+		m(ptr)
 	}
 
 	for i, f := range dataFields {
@@ -115,6 +127,18 @@ func New(w int, id string, dataFields []*DataField, createFunc func(alt bool) (s
 			inpFields[i].SetValue(f.GetValue())
 		} else {
 			inpFields[i].SetValue(*f.Value)
+		}
+	}
+
+	log.Println("====== full list =====", id)
+	for _, f := range inpFields {
+		log.Println("->", f.Value())
+	}
+	log.Println("/====== full list =====/")
+
+	for i, f := range inpFields {
+		if f.Validate != nil {
+			inpFields[i].Err = f.Validate(f.Value())
 		}
 	}
 
@@ -191,20 +215,15 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 			} else {
 				batcher = append(batcher, c.focusField(nf))
 			}
-		case "alt+enter":
-			if c.focusedField == BTN_SAVE {
-				passToChildren = false
-				batcher = append(batcher, c.handleSaveEnter(true))
-			}
-		case "enter":
+		case "enter", "alt":
 			passToChildren = false
 			switch c.focusedField {
 			case BTN_SAVE:
 				// save
-				batcher = append(batcher, c.handleSaveEnter(false))
+				batcher = append(batcher, c.handleSaveEnter(msg.Alt))
 			case BTN_DEL:
 				// delete
-				err := c.del(c.ItemID)
+				err := c.del(msg.Alt, c.ItemID)
 				if err != nil {
 					// TODO: Better error handling lmao
 					panic("Can't delete: " + err.Error())
@@ -249,7 +268,9 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 				if errors.Is(f.Err, APIErr("")) {
 					continue
 				}
-				c.inpFields[i].Err = f.Validate(f.Value())
+				if f.Validate != nil {
+					c.inpFields[i].Err = f.Validate(f.Value())
+				}
 			}
 		}
 	}
@@ -259,7 +280,6 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 
 func (c *Model) SetWidth(w int) {
 	c.width = w
-	log.Println("WIDTH", w)
 
 	for _, row := range c.layout {
 		if row[0] < 0 {

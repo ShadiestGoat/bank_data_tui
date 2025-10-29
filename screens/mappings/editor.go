@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/utils/editor"
@@ -113,7 +114,7 @@ func (c *mappingImpl) NewEditor(w, h int, v *mappingProxy) *editor.Model {
 					}
 
 					for _, c := range c.cache.Categories {
-						if c.Name == raw {
+						if strings.EqualFold(raw, c.Name) {
 							v.ResCategoryID = c.ID
 							return
 						}
@@ -133,8 +134,20 @@ func (c *mappingImpl) NewEditor(w, h int, v *mappingProxy) *editor.Model {
 			}
 			return id, nil
 		},
-		func(_ bool, id string) error { panic("unimplemented") },
-		func(id string) error { panic("unimplemented") },
+		func(alt bool, id string) error {
+			err := c.api.MappingsUpdate(id, (*api.Mapping)(v), alt)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		func(alt bool, id string) error {
+			err := c.api.MappingsDelete(id, alt)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
 		editor.RequireFields(0),
 		editor.AddIntValidator(1),
 		editor.AddFloatValidator(3),
@@ -155,16 +168,16 @@ func (c *mappingImpl) NewEditor(w, h int, v *mappingProxy) *editor.Model {
 			}
 
 			for _, c := range c.cache.Categories {
-				if s == c.Name {
+				if strings.EqualFold(s, c.Name) {
 					return nil
 				}
 			}
 
 			return fmt.Errorf("Must be a valid category")
 		}),
-		func(fields []textinput.Model) {
+		func(fields []*textinput.Model) {
 			fields[5].ShowSuggestions = true
-			c.categoryField = &fields[5]
+			c.categoryField = fields[5]
 			c.resetSuggestions()
 		},
 		editor.AddOneOfRequirement("matcher", 2, 3),

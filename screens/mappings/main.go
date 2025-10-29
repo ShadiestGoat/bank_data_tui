@@ -1,8 +1,6 @@
 package mappings
 
 import (
-	"log"
-
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/utils/listeditor"
 	"github.com/bank_data_tui/utils/repo"
@@ -37,7 +35,6 @@ func (m *mappingImpl) Init() tea.Cmd {
 		if err != nil {
 			panic(err)
 		}
-		log.Println("Murka", len(m.cache.Categories))
 
 		return absSetup{}
 	}

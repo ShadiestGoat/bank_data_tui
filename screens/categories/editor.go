@@ -74,7 +74,7 @@ func (c *categoryImpl) NewEditor(w, h int, v *categoryProxy) *editor.Model {
 			return id, nil
 		},
 		func(_ bool, id string) error { return c.api.CategoriesUpdate(id, &v.SavableCategory) },
-		func(id string) error { return c.api.CategoriesDelete(id) },
+		func(_ bool, id string) error { return c.api.CategoriesDelete(id) },
 		editor.RequireFields(0, 1, 2),
 		editor.AddFieldValidator(1, func(s string) error {
 			return verifyColor(s)
