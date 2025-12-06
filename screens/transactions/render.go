@@ -11,24 +11,34 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-//  1     60%     40%     8
-// ICON | NAME | DESC | AMT
+//  1     60%     40%    10     8
+// ICON | NAME | DESC | DATE | AMT
 //
 
-const COL_SPLIT = " | "
+const COL_SPLIT = "│"
 
 func (m *Model) cols() []int {
+	colCunt := 4
+
 	icon := 2
 	amt := 8
+	date := 10
 
-	leftover := m.w - icon - amt - len(COL_SPLIT)*3
+	// space padding on either side + content
+	colTotalWidth := lipgloss.Width(COL_SPLIT)*colCunt + colCunt * 2
+	leftover := m.w - icon - amt - date - colTotalWidth
 
 	nameLen := int(float64(leftover) * 0.6)
 
-	return []int{icon, nameLen, leftover - nameLen, amt}
+	return []int{icon, nameLen, leftover - nameLen, date, amt}
 }
 
-func (m *Model) renderRow(t *api.Transaction, selected bool) string {
+func (m Model) renderRow(t *api.Transaction, selected bool) string {
+	rowStyle := lipgloss.NewStyle()
+	if selected {
+		rowStyle = rowStyle.Background(styles.COLOR_MAIN)
+	}
+
 	cols := m.cols()
 	str := make([]string, len(cols))
 	var cat *api.Category
@@ -42,24 +52,23 @@ func (m *Model) renderRow(t *api.Transaction, selected bool) string {
 		}
 	}
 
-	if len(cols) == 3 {
-		if t.ResolvedName != nil {
-			str[1] = *t.ResolvedName
-		} else {
-			str[1] = lipgloss.NewStyle().Faint(true).Italic(true).Render(t.Desc)
-		}
-	} else {
-		str[2] = t.Desc
-		if t.ResolvedName != nil {
-			str[1] = *t.ResolvedName
-			str[2] = lipgloss.NewStyle().Faint(true).Italic(true).Render(str[2])
-		}
+	str[2] = t.Desc
+	str[3] = t.AuthedAt.Format("02/01/2006")
+
+	if t.ResolvedName != nil {
+		str[1] = *t.ResolvedName
+		str[2] = lipgloss.NewStyle().Faint(true).Render(str[2])
 	}
 
-	str[len(str)-1] = strconv.FormatFloat(t.Amount, 'f', 2, 64)
+	str[4] = strconv.FormatFloat(t.Amount, 'f', 2, 64)
 
 	for i, w := range cols {
-		str[i] = lipgloss.NewStyle().Width(w).Render(
+		base := rowStyle
+		if i == 0 {
+			base = lipgloss.NewStyle()
+		}
+
+		str[i] = base.Width(w).Render(
 			utils.Overflow(str[i], w),
 		)
 	}
@@ -70,24 +79,22 @@ func (m *Model) renderRow(t *api.Transaction, selected bool) string {
 		).Foreground(lipgloss.AdaptiveColor{"#ffffff", "#000000"}).Render(str[0] + " ")
 	}
 
-	rowStyle := lipgloss.NewStyle()
-	if selected {
-		rowStyle = rowStyle.Background(styles.COLOR_MAIN)
-	}
+	colSplitter := rowStyle.Render(" " + COL_SPLIT + " ")
 
-	return str[0] + COL_SPLIT[1:len(COL_SPLIT)-1] + rowStyle.Render(
-		" "+strings.Join(str[1:], COL_SPLIT),
+	// str[0] alr has a space in it
+	return str[0] + COL_SPLIT + rowStyle.Render(
+		" "+strings.Join(str[1:], colSplitter),
 	)
 }
 
-func (m *Model) View() string {
+func (m Model) View() string {
 	if m.h == 0 || len(m.items) == 0 {
 		return ""
 	}
 
 	items := m.items[m.viewportOff:]
 	// 1 line empty at the bottom
-	items = items[:min(len(items), m.h - 1)]
+	items = items[:min(len(items), m.h-1)]
 
 	if len(items) == 0 {
 		return "No Items here!"
@@ -95,9 +102,23 @@ func (m *Model) View() string {
 
 	rows := ""
 	for i, v := range items {
-		rows += m.renderRow(v, m.selected == m.viewportOff + i) + "\n"
+		rows += m.renderRow(v, m.selected == m.viewportOff+i) + "\n"
 	}
 
+	lastRowItems := []string{"Total Transactions: " + strconv.Itoa(len(m.items))}
+	if m.nextPageLoading {
+		loading := m.loader.View()
+		lastRowItems = append(
+			lastRowItems,
+			loading+lipgloss.NewStyle().Faint(true).Render(" Loading"),
+		)
+	}
 
-	return rows[:len(rows)-1]
+	rows = rows[:len(rows)-1]
+
+	if m.hasHitLastPage && m.h-len(items) > 3 {
+		rows += "\n\n\n" + lipgloss.PlaceHorizontal(m.w, lipgloss.Center, "No More Transactions!")
+	}
+
+	return rows + strings.Repeat("\n", m.h-strings.Count(rows, "\n")-1) + utils.JoinHorizontalWithSpacer(m.w, 1, lastRowItems...)
 }

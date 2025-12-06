@@ -7,6 +7,7 @@ import (
 )
 
 type Transaction struct {
+	ID                 string    `json:"id"`
 	SettledAt          time.Time `json:"settledAt"`
 	AuthedAt           time.Time `json:"authedAt"`
 	Desc               string    `json:"description"`
