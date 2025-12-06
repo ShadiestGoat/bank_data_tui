@@ -9,6 +9,7 @@ import (
 
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/styles"
+	"github.com/bank_data_tui/utils"
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -118,12 +119,6 @@ func (m Model) cleanPath(s string) string {
 	return s + suffix
 }
 
-func (m *Model) Resize(w, h int) {
-	m.w, m.h = w, h
-	m.picker.SetHeight(h - 5)
-	m.dirInput.Width = w - 5
-}
-
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.dirInput.Focus(),
@@ -211,6 +206,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				batcher = append(batcher, m.selectPath(m.dirInput.Value()))
 			}
 		}
+	case utils.ResizeMessage:
+		m.w, m.h = msg.W, msg.H
+		m.picker.SetHeight(msg.H - 5)
+		m.dirInput.Width = msg.W - 5
 	}
 
 	if m.path != "" {

@@ -93,3 +93,7 @@ func Overflow(str string, maxWidth int) string {
 
 	return strings.Join(lines, "\n")
 }
+
+type ResizeMessage struct {
+	W, H int
+}

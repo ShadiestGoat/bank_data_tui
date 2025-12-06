@@ -115,10 +115,3 @@ func (m Model[T, PT]) View() string {
 
 	return res
 }
-
-func (m *Model[T, PT]) Resize(w, h int) {
-	m.w, m.h = w, h
-
-	m.list.SetHeight(h)
-	m.editor.SetWidth(w - WIDTH_OFFSET_EDITOR)
-}

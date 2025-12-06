@@ -3,6 +3,7 @@ package listeditor
 import (
 	"slices"
 
+	"github.com/bank_data_tui/utils"
 	"github.com/bank_data_tui/utils/editor"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -48,6 +49,11 @@ func (m *Model[T, PT]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			bubble = false
 			m.list.CursorDown()
 		}
+	case utils.ResizeMessage:
+		m.w, m.h = msg.W, msg.H
+
+		m.list.SetHeight(msg.H)
+		m.editor.SetWidth(msg.W - WIDTH_OFFSET_EDITOR)
 	}
 
 	if !m.isLoaded {

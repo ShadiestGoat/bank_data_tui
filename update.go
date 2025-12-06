@@ -8,6 +8,7 @@ import (
 	"github.com/bank_data_tui/screens/mappings"
 	"github.com/bank_data_tui/screens/transactions"
 	"github.com/bank_data_tui/screens/upload"
+	"github.com/bank_data_tui/utils"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -32,6 +33,7 @@ func (m *mainApp) switchToScreen(s Screen) tea.Cmd {
 }
 
 func (m *mainApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	batcher := []tea.Cmd{}
 
 	passToChildren := false
@@ -69,9 +71,11 @@ func (m *mainApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 
-		if s, ok := m.screenImp.(interface{ Resize(w, h int) }); ok {
-			s.Resize(m.width, m.height-HEADER_HEIGHT)
-		}
+		m.screenImp, cmd = m.screenImp.Update(utils.ResizeMessage{
+			W: m.width,
+			H: m.height-HEADER_HEIGHT,
+		})
+		batcher = append(batcher, cmd)
 	case login.LoginEntered:
 		screen, ok := m.screenImp.(*login.Model)
 		if !ok {
@@ -91,7 +95,6 @@ func (m *mainApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if passToChildren {
-		var cmd tea.Cmd
 		m.screenImp, cmd = m.screenImp.Update(msg)
 		batcher = append(batcher, cmd)
 	}
