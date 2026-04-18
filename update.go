@@ -3,13 +3,13 @@ package main
 import (
 	"log"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/bank_data_tui/screens/categories"
 	"github.com/bank_data_tui/screens/login"
 	"github.com/bank_data_tui/screens/mappings"
 	"github.com/bank_data_tui/screens/transactions"
 	"github.com/bank_data_tui/screens/upload"
 	"github.com/bank_data_tui/utils"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 func (m *mainApp) switchToScreen(s Screen) tea.Cmd {
@@ -39,7 +39,7 @@ func (m *mainApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	passToChildren := false
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
@@ -73,7 +73,7 @@ func (m *mainApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.screenImp, cmd = m.screenImp.Update(utils.ResizeMessage{
 			W: m.width,
-			H: m.height-HEADER_HEIGHT,
+			H: m.height - HEADER_HEIGHT,
 		})
 		batcher = append(batcher, cmd)
 	case login.LoginEntered:
@@ -88,7 +88,7 @@ func (m *mainApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			batcher = append(batcher, m.switchToScreen(S_TRANS))
 		}
-	case upload.FileUploadComplete:
+	case utils.MsgGoToHome:
 		batcher = append(batcher, m.switchToScreen(S_TRANS))
 	default:
 		passToChildren = true

@@ -1,11 +1,11 @@
 package mappings
 
 import (
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/utils/listeditor"
 	"github.com/bank_data_tui/utils/repo"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 type mappingImpl struct {
@@ -27,7 +27,7 @@ func (m *mappingImpl) InitialFetch() ([]*mappingProxy, error) {
 	return arr, nil
 }
 
-type absSetup struct {}
+type absSetup struct{}
 
 func (m *mappingImpl) Init() tea.Cmd {
 	return func() tea.Msg {

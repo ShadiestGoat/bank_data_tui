@@ -4,8 +4,8 @@ import (
 	"slices"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 func (c *Model) focusField(f int) tea.Cmd {
@@ -41,6 +41,8 @@ func (c Model) handleNavKey(key string) (bool, int) {
 			}
 		}
 
+		return true, c.navKeyHorizontal(1)
+	case "enter":
 		return true, c.navKeyHorizontal(1)
 	case "shift+tab":
 		return true, c.navKeyHorizontal(-1)
@@ -83,20 +85,20 @@ func (c Model) navKeyHorizontal(dir int) int {
 	cy, cx := c.rowColForIndex(c.focusedField)
 
 	// handle horizontal first
-	if cx + dir >= 0 && cx + dir < len(c.layout[cy]) {
-		return c.layout[cy][cx + dir]
+	if cx+dir >= 0 && cx+dir < len(c.layout[cy]) {
+		return c.layout[cy][cx+dir]
 	}
 
-	if cy + dir < 0 {
+	if cy+dir < 0 {
 		row := len(c.layout) - 1
-		return c.layout[row][len(c.layout[row]) - 1]
-	} else if cy + dir >= len(c.layout) {
+		return c.layout[row][len(c.layout[row])-1]
+	} else if cy+dir >= len(c.layout) {
 		return c.layout[0][0]
 	}
-	
+
 	row := cy + dir
 	if dir < 0 {
-		return c.layout[row][len(c.layout[row]) - 1]
+		return c.layout[row][len(c.layout[row])-1]
 	}
 
 	return c.layout[row][0]
@@ -106,24 +108,24 @@ func (c Model) navKeyVertical(dir int) int {
 	cy, cx := c.rowColForIndex(c.focusedField)
 
 	// Out of bounds first
-	if cy + dir < 0 {
-		return c.layout[len(c.layout) - 1][0]
-	} else if cy + dir >= len(c.layout) {
+	if cy+dir < 0 {
+		return c.layout[len(c.layout)-1][0]
+	} else if cy+dir >= len(c.layout) {
 		return c.layout[0][0]
 	}
 
-	curPerc := float64(cx)/float64(len(c.layout[cy]))
-	nextLen := float64(len(c.layout[cy + dir]))
-	for i := range c.layout[cy + dir] {
-		p := float64(i)/nextLen
+	curPerc := float64(cx) / float64(len(c.layout[cy]))
+	nextLen := float64(len(c.layout[cy+dir]))
+	for i := range c.layout[cy+dir] {
+		p := float64(i) / nextLen
 		if curPerc == p {
-			return c.layout[cy + dir][i]
+			return c.layout[cy+dir][i]
 		}
 
 		if curPerc < float64(i)/nextLen {
-			return c.layout[cy + dir][max(i - 1, 0)]
+			return c.layout[cy+dir][max(i-1, 0)]
 		}
 	}
 
-	return c.layout[cy + dir][len(c.layout[cy + dir]) - 1]
+	return c.layout[cy+dir][len(c.layout[cy+dir])-1]
 }

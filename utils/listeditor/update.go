@@ -3,16 +3,16 @@ package listeditor
 import (
 	"slices"
 
+	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
 	"github.com/bank_data_tui/utils"
 	"github.com/bank_data_tui/utils/editor"
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 type ItemNew struct{ Value any }
 type ItemUpdate struct{ Value any }
 
-func (m *Model[T, PT]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model[T, PT]) Update(msg tea.Msg) (utils.Screen, tea.Cmd) {
 	batcher := []tea.Cmd{}
 	var cmd tea.Cmd
 	bubble := true
@@ -40,7 +40,7 @@ func (m *Model[T, PT]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		batcher = append(batcher, func() tea.Msg {
 			return ItemUpdate{Value: m.curItem}
 		})
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "alt+up":
 			bubble = false
@@ -67,7 +67,7 @@ func (m *Model[T, PT]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if bubble {
 		forList := false
-		if msg, ok := msg.(tea.KeyMsg); ok {
+		if msg, ok := msg.(tea.KeyPressMsg); ok {
 			forList = doesKeyMatchList(msg, m.list)
 		}
 

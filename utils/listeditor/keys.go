@@ -1,9 +1,9 @@
 package listeditor
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
 )
 
 var listKeyMap = list.KeyMap{
@@ -51,7 +51,7 @@ var listKeyMap = list.KeyMap{
 	),
 }
 
-func doesKeyMatchList(k tea.KeyMsg, l list.Model) bool {
+func doesKeyMatchList(k tea.KeyPressMsg, l list.Model) bool {
 	if l.FilterState() == list.Filtering {
 		return key.Matches(
 			k,

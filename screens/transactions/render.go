@@ -5,10 +5,12 @@ import (
 	"strconv"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/styles"
 	"github.com/bank_data_tui/utils"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/shadiestgoat/colorutils"
 )
 
 //  1     60%     40%    10     8
@@ -25,7 +27,7 @@ func (m *Model) cols() []int {
 	date := 10
 
 	// space padding on either side + content
-	colTotalWidth := lipgloss.Width(COL_SPLIT)*colCunt + colCunt * 2
+	colTotalWidth := lipgloss.Width(COL_SPLIT)*colCunt + colCunt*2
 	leftover := m.w - icon - amt - date - colTotalWidth
 
 	nameLen := int(float64(leftover) * 0.6)
@@ -74,9 +76,19 @@ func (m Model) renderRow(t *api.Transaction, selected bool) string {
 	}
 
 	if cat != nil {
+		c, err := strconv.Atoi(cat.Color)
+		if err == nil {
+			c = 0xffffff
+		}
+		_, _, l := colorutils.RGBToHSL(uint8(c >> 16), uint8((c >> 8) & 0xff), uint8(c & 0xff))
+		fg := lipgloss.Color("#000000")
+		if l > 0.4 {
+			fg = lipgloss.Color("#ffffff")
+		}
+
 		str[0] = lipgloss.NewStyle().Background(
 			lipgloss.Color("#" + cat.Color),
-		).Foreground(lipgloss.AdaptiveColor{"#ffffff", "#000000"}).Render(str[0] + " ")
+		).Foreground(fg).Width(2).Render(str[0])
 	}
 
 	colSplitter := rowStyle.Render(" " + COL_SPLIT + " ")
@@ -87,9 +99,9 @@ func (m Model) renderRow(t *api.Transaction, selected bool) string {
 	)
 }
 
-func (m Model) View() string {
+func (m Model) View() (string, *tea.Cursor) {
 	if m.h == 0 || len(m.items) == 0 {
-		return ""
+		return "", nil
 	}
 
 	items := m.items[m.viewportOff:]
@@ -97,7 +109,7 @@ func (m Model) View() string {
 	items = items[:min(len(items), m.h-1)]
 
 	if len(items) == 0 {
-		return "No Items here!"
+		return "No Items here!", nil
 	}
 
 	rows := ""
@@ -120,5 +132,7 @@ func (m Model) View() string {
 		rows += "\n\n\n" + lipgloss.PlaceHorizontal(m.w, lipgloss.Center, "No More Transactions!")
 	}
 
-	return rows + strings.Repeat("\n", m.h-strings.Count(rows, "\n")-1) + utils.JoinHorizontalWithSpacer(m.w, 1, lastRowItems...)
+	res, _ := utils.JoinHorizontalWithSpacer(m.w, 1, lastRowItems...)
+
+	return rows + strings.Repeat("\n", m.h-strings.Count(rows, "\n")-1) + res, nil
 }

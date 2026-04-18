@@ -1,15 +1,15 @@
 package listeditor
 
 import (
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bank_data_tui/utils/editor"
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/spinner"
 )
 
 const (
-	WIDTH_LIST               = 15
+	WIDTH_LIST               = 20
 	WIDTH_EDITOR_SPLIT_SPACE = 2
 	WIDTH_OFFSET_EDITOR      = WIDTH_LIST + 1 + WIDTH_EDITOR_SPLIT_SPACE + WIDTH_EDITOR_SPLIT_SPACE // border + margin + padding
 )
@@ -93,19 +93,23 @@ func (m *Model[T, PT]) Init() tea.Cmd {
 		m.editor.Init(),
 	}
 
-	if a, ok := m.Abstraction.(interface {Init() tea.Cmd}); ok {
+	if a, ok := m.Abstraction.(interface{ Init() tea.Cmd }); ok {
 		batcher = append(batcher, a.Init())
 	}
 
 	return tea.Batch(batcher...)
 }
 
-func (m Model[T, PT]) View() string {
+func (m Model[T, PT]) View() (string, *tea.Cursor) {
 	if !m.isLoaded {
-		return m.spin.View()
+		return m.spin.View(), nil
 	}
 
-	l, e := m.list.View(), m.editor.View()
+	l := m.list.View()
+	e, cur := m.editor.View()
+	if cur != nil {
+		cur.X += WIDTH_OFFSET_EDITOR
+	}
 
 	res := lipgloss.JoinHorizontal(
 		lipgloss.Top,
@@ -113,5 +117,5 @@ func (m Model[T, PT]) View() string {
 		STYLE_SPLIT.Height(m.h).Render(e),
 	)
 
-	return res
+	return res, cur
 }

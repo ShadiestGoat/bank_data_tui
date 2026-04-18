@@ -4,17 +4,20 @@ import (
 	"fmt"
 	"time"
 
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bank_data_tui/styles"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/bank_data_tui/utils"
 )
 
 var (
-	STYLE_MOD_OK       = lipgloss.NewStyle().Foreground(styles.COLOR_MAIN)
+	// STYLE_MOD_OK       = lipgloss.NewStyle().Foreground(styles.COLOR_MAIN)
 	STYLE_MOD_DISABLED = lipgloss.NewStyle().BorderForeground(lipgloss.ANSIColor(8)).Background(lipgloss.ANSIColor(8))
 	STYLE_MOD_WRONG    = lipgloss.NewStyle().BorderForeground(lipgloss.ANSIColor(9)).Background(lipgloss.ANSIColor(9))
 )
+
+var _ utils.Screen = &Model{} // compile check
 
 type Model struct {
 	focusedField int
@@ -32,9 +35,20 @@ func NewScreenLogin() *Model {
 	inpPass := textinput.New()
 
 	for i, inp := range []*textinput.Model{&inpName, &inpPass} {
-		inp.Width = 15
+		inp.SetWidth(15)
 		inp.Prompt = ""
-		inp.TextStyle = lipgloss.NewStyle().Foreground(styles.COLOR_MAIN)
+		inp.SetVirtualCursor(false)
+		inp.SetStyles(textinput.Styles{
+			Focused: textinput.StyleState{
+				Text:        styles.S_TEXT_HIGHLIGHT,
+				Placeholder: styles.S_TEXT_DISABLED,
+			},
+			Blurred: textinput.StyleState{
+				Text:        styles.S_TEXT_DISABLED,
+				Placeholder: styles.S_TEXT_DISABLED,
+			},
+			Cursor: styles.TI_CURSOR,
+		})
 
 		switch i {
 		case 0:
@@ -71,7 +85,7 @@ func (s Model) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (s Model) View() string {
+func (s Model) View() (string, *tea.Cursor) {
 	name := s.inpName.View()
 	pass := s.inpPass.View()
 	btnStyle := styles.STYLE_BTN
@@ -84,10 +98,25 @@ func (s Model) View() string {
 		}
 	}
 
+	var c *tea.Cursor
+
+	if s.state == 0 && s.focusedField != 2 {
+		if s.focusedField == 0 {
+			c = s.inpName.Cursor()
+		} else {
+			c = s.inpPass.Cursor()
+		}
+
+		if c != nil {
+			c.X += 2
+			c.Y += 1
+			if s.focusedField == 1 {
+				c.Y += 4
+			}
+		}
+	}
+
 	switch s.state {
-	case 0:
-		btnStyle = btnStyle.Inherit(STYLE_MOD_OK)
-		fieldStyle = fieldStyle.Inherit(STYLE_MOD_OK)
 	case 1:
 		btnStyle = btnStyle.Inherit(STYLE_MOD_DISABLED)
 		fieldStyle = fieldStyle.Inherit(STYLE_MOD_DISABLED)
@@ -103,7 +132,7 @@ func (s Model) View() string {
 		fieldStyle.Render(pass),
 		"",
 		btnStyle.Render("Login"),
-	)
+	), c
 }
 
 // [username, password]
@@ -133,11 +162,11 @@ func (s *Model) changeField(newField int) tea.Cmd {
 	return nil
 }
 
-func (s *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (s *Model) Update(msg tea.Msg) (utils.Screen, tea.Cmd) {
 	batcher := []tea.Cmd{}
 
 	switch m := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if s.state != 1 {
 			switch m.String() {
 			case "tab", "down":

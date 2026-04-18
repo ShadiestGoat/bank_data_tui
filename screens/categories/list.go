@@ -3,11 +3,12 @@ package categories
 import (
 	"io"
 
+	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bank_data_tui/styles"
+	"github.com/bank_data_tui/utils"
 	"github.com/bank_data_tui/utils/listeditor"
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type categoryDelegate struct{}
@@ -36,7 +37,7 @@ func (c categoryDelegate) Render(w io.Writer, m list.Model, i int, v list.Item) 
 	}
 
 	w.Write(
-		[]byte(" " + style.Render("["+cat.Icon+"] "+cat.Name)),
+		[]byte(" " + style.Render(utils.Overflow("["+cat.Icon+"] "+cat.Name, listeditor.WIDTH_LIST - 1))),
 	)
 }
 

@@ -3,14 +3,14 @@ package editor
 import (
 	"errors"
 	"fmt"
-	"log"
 	"slices"
 
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bank_data_tui/api"
+	"github.com/bank_data_tui/styles"
 	"github.com/bank_data_tui/utils"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type DataField struct {
@@ -86,7 +86,19 @@ func New(
 		f := textinput.New()
 		f.Prompt = ""
 		f.Blur()
-		f.Width = 15
+		f.SetWidth(15)
+		f.SetVirtualCursor(false)
+		f.SetStyles(textinput.Styles{
+			Focused: textinput.StyleState{
+				Text:        lipgloss.Style{},
+				Placeholder: styles.S_TEXT_DISABLED,
+			},
+			Blurred: textinput.StyleState{
+				Text:        styles.S_TEXT_DISABLED,
+				Placeholder: styles.S_TEXT_DISABLED,
+			},
+			Cursor: styles.TI_CURSOR,
+		})
 		f.Placeholder = d.Title
 		f.KeyMap.NextSuggestion.SetKeys("ctrl+n")
 		f.KeyMap.PrevSuggestion.SetKeys("ctrl+p")
@@ -129,12 +141,6 @@ func New(
 			inpFields[i].SetValue(*f.Value)
 		}
 	}
-
-	log.Println("====== full list =====", id)
-	for _, f := range inpFields {
-		log.Println("->", f.Value())
-	}
-	log.Println("/====== full list =====/")
 
 	for i, f := range inpFields {
 		if f.Validate != nil {
@@ -195,7 +201,7 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	passToChildren := true
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if c.popupVisible {
 			passToChildren = false
 		}
@@ -220,10 +226,10 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 			switch c.focusedField {
 			case BTN_SAVE:
 				// save
-				batcher = append(batcher, c.handleSaveEnter(msg.Alt))
+				batcher = append(batcher, c.handleSaveEnter(msg.Mod.Contains(tea.ModAlt)))
 			case BTN_DEL:
 				// delete
-				err := c.del(msg.Alt, c.ItemID)
+				err := c.del(msg.Mod.Contains(tea.ModAlt), c.ItemID)
 				if err != nil {
 					// TODO: Better error handling lmao
 					panic("Can't delete: " + err.Error())
@@ -240,7 +246,9 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 					}
 				}
 			default:
-				batcher = append(batcher, c.focusField(c.focusedField+1))
+				_, nf := c.handleNavKey("enter")
+
+				batcher = append(batcher, c.focusField(nf))
 			}
 		}
 	case validationErrMsg:
@@ -262,7 +270,7 @@ func (c *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 			c.inpFields[i], cmd = f.Update(msg)
 			batcher = append(batcher, cmd)
 		}
-		if _, ok := msg.(tea.KeyMsg); ok {
+		if _, ok := msg.(tea.KeyPressMsg); ok {
 			for i, f := range c.inpFields {
 				// re-validate cause some validators need to be triggered external events
 				if errors.Is(f.Err, APIErr("")) {
@@ -299,7 +307,7 @@ func (c *Model) SetWidth(w int) {
 			if f.Flex {
 				flexers++
 			} else {
-				availWidth -= c.inpFields[i].Width
+				availWidth -= c.inpFields[i].Width()
 			}
 		}
 
@@ -314,9 +322,9 @@ func (c *Model) SetWidth(w int) {
 			if !c.dataFields[i].Flex {
 				continue
 			}
-			c.inpFields[i].Width = availWidth / flexers
+			c.inpFields[i].SetWidth(availWidth / flexers)
 			if extraSpaceEvery != 0 && spaceBuf == extraSpaceEvery {
-				c.inpFields[i].Width += 1
+				c.inpFields[i].SetWidth(availWidth/flexers + 1)
 				spaceBuf = 0
 			} else {
 				spaceBuf++

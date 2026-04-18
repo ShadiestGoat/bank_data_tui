@@ -1,274 +1,132 @@
 package upload
 
 import (
-	"errors"
 	"log"
 	"os"
-	"path"
-	"strings"
+	"time"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/styles"
 	"github.com/bank_data_tui/utils"
-	"github.com/charmbracelet/bubbles/filepicker"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/bank_data_tui/utils/filepicker"
 )
 
 type Model struct {
-	api      *api.APIClient
-	dirInput textinput.Model
-	picker   filepicker.Model
-	spin     spinner.Model
-	path     string
-
-	home string
-	cwd  string
-
-	w, h int
+	api           *api.APIClient
+	filepicker    filepicker.Model
+	uploadingPath string
+	err           error
+	spin          spinner.Model
+	w, h          int
 }
 
 const INP_PADDING = 5
 
-var fileErr = errors.New("is file :?")
+type uploaded struct {
+	err error
+}
 
 func New(api *api.APIClient, w, h int) *Model {
-	fp := filepicker.New()
-	fp.SetHeight(h - 5)
-	fp.AllowedTypes = []string{"tsv", "csv"}
-	fp.DirAllowed = false
-	fp.ShowPermissions = false
-
-	inp := textinput.New()
-	inp.Width = w - 5
-	inp.Prompt = ""
-	inp.Focus()
-	inp.ShowSuggestions = true
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-
 	m := &Model{
-		api:    api,
-		picker: fp,
-		spin:   spinner.New(spinner.WithSpinner(spinner.Ellipsis)),
-		w:      w, h: h,
-		home: home, cwd: cwd,
+		api: api,
+		w:   w, h: h,
+		spin: spinner.New(spinner.WithStyle(styles.S_TEXT_HIGHLIGHT)),
 	}
 
-	inp.Validate = func(s string) error {
-		s = m.cleanPath(s)
+	fp := filepicker.New(w, h, []string{"tsv", "csv"})
 
-		info, err := os.Stat(s)
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			return fileErr
-		}
-
-		return nil
-	}
-
-	fp.CurrentDirectory = m.cleanPath(".")
-	inpDir, ok := strings.CutPrefix(fp.CurrentDirectory, m.home)
-	if ok {
-		inpDir = "~" + inpDir
-	}
-	inp.SetValue(inpDir)
-
-	m.dirInput = inp
+	m.filepicker = fp
 
 	return m
 }
 
-func (m Model) cleanPath(s string) string {
-	suffix := ""
-	if strings.HasSuffix(s, "/") {
-		suffix = "/"
-	}
-	if s == "" {
-		return "/"
-	}
-
-	if s[0] != '/' && s != "~" && !strings.HasPrefix(s, "~/") {
-		s = m.cwd + "/" + s
-	}
-
-	s = path.Clean(s)
-	if s == "~" {
-		return m.home
-	}
-	if s == "/" {
-		return s
-	}
-
-	s, ok := strings.CutPrefix(s, "~/")
-	if ok {
-		s = m.home + "/" + s
-	}
-
-	return s + suffix
-}
-
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
-		m.dirInput.Focus(),
-		m.picker.Init(),
-	)
+	return m.filepicker.Init()
 }
 
-func (m Model) View() string {
-	box := lipgloss.NewStyle().Width(m.w).Height(m.h).Align(lipgloss.Left, lipgloss.Right)
+func (m Model) View() (string, *tea.Cursor) {
+	box := lipgloss.NewStyle().Width(m.w).Height(m.h).Align(lipgloss.Left, lipgloss.Top)
 
-	if m.path != "" {
-		return box.Render(m.spin.View() + " Uploading transactions")
+	if m.uploadingPath == "" {
+		res, cur := m.filepicker.View()
+		return box.Render(res), cur
 	}
 
-	inp := lipgloss.NewStyle().MaxWidth(m.dirInput.Width).Render(m.dirInput.View())
-	fieldStyle := styles.STYLE_FIELD
-	if m.dirInput.Err != nil {
-		if m.dirInput.Focused() {
-			fieldStyle = fieldStyle.BorderForeground(styles.COLOR_WRONG)
-		} else {
-			fieldStyle = fieldStyle.BorderForeground(styles.COLOR_DISABLED)
-		}
-	} else if m.dirInput.Focused() {
-		fieldStyle = fieldStyle.BorderForeground(styles.COLOR_MAIN)
-	}
-
-	return box.Render(
-		fieldStyle.Render(inp) + "\n\n" +
-			m.picker.View(),
-	)
-}
-
-func (m *Model) setSuggestions() {
-	if m.dirInput.Err != nil {
-		return
-	}
-
-	p := m.cleanPath(m.dirInput.Value())
-	if strings.HasSuffix(m.dirInput.Value(), "/") {
-		p = strings.TrimSuffix(p, "/")
+	var res string
+	if m.err != nil {
+		res = lipgloss.JoinVertical(
+			lipgloss.Center,
+			"!! "+styles.S_TEXT_WRONG.Render("Error Uploading")+" !!",
+			m.uploadingPath,
+			"",
+			styles.S_TEXT_WRONG.Render(m.err.Error()),
+		)
 	} else {
-		p = path.Dir(p)
+		spin := m.spin.View()
+		res = lipgloss.JoinVertical(
+			lipgloss.Center,
+			spin+" "+styles.S_TEXT_HIGHLIGHT_SECONDARY.Render("Uploading...")+" "+spin,
+			"",
+			m.uploadingPath,
+		)
 	}
 
-	suggBase := p
-	if strings.HasPrefix(m.dirInput.Value(), "~/") {
-		suggBase = "~" + strings.TrimPrefix(p, m.home)
-	}
-
-	dirEntry, err := os.ReadDir(p)
-	if err == nil {
-		suggs := []string{}
-		for _, e := range dirEntry {
-			if !strings.HasPrefix(e.Name(), ".") && e.IsDir() {
-				suggs = append(suggs, suggBase+"/"+e.Name())
-			}
-		}
-
-		m.dirInput.SetSuggestions(suggs)
-	}
+	return box.AlignHorizontal(lipgloss.Center).Render(res), nil
 }
 
-type FileUploadComplete bool
-
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-	batcher := []tea.Cmd{}
-
+func (m Model) Update(msg tea.Msg) (utils.Screen, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "tab", "shift+tab", "down", "up":
-			if m.dirInput.Focused() {
-				sug := m.dirInput.CurrentSuggestion()
-				if msg.String() == "tab" && sug != "" && sug != m.dirInput.Value() {
-					m.dirInput.SetValue(m.dirInput.CurrentSuggestion())
-				} else {
-					m.dirInput.Blur()
-				}
-			} else {
-				batcher = append(batcher, m.dirInput.Focus())
-			}
-		case "enter":
-			if m.dirInput.Focused() && m.dirInput.Err == fileErr {
-				batcher = append(batcher, m.selectPath(m.dirInput.Value()))
-			}
-		}
 	case utils.ResizeMessage:
 		m.w, m.h = msg.W, msg.H
-		m.picker.SetHeight(msg.H - 5)
-		m.dirInput.Width = msg.W - 5
-	}
-
-	if m.path != "" {
-		m.spin, cmd = m.spin.Update(msg)
-		batcher = append(batcher, cmd)
-	} else {
-		if m.dirInput.Focused() {
-			m.dirInput, cmd = m.dirInput.Update(msg)
-			if m.dirInput.Err == nil && m.dirInput.Value() != "" {
-				np := m.cleanPath(m.dirInput.Value())
-				if np != m.picker.CurrentDirectory {
-					m.picker.CurrentDirectory = np
-					batcher = append(batcher, m.picker.Init())
-				}
-			}
-
-			batcher = append(batcher, cmd)
-			m.setSuggestions()
+		m.filepicker.SetSize(msg.W, msg.H)
+		return m, nil
+	case uploaded:
+		var cmd tea.Cmd
+		if msg.err != nil {
+			m.err = msg.err
+			cmd = clearErrCMD
+		} else {
+			cmd = utils.GoToHome
 		}
 
-		_, isKey := msg.(tea.KeyMsg)
-		if !isKey || !m.dirInput.Focused() {
-			oldPath := m.cleanPath(m.picker.CurrentDirectory)
-			m.picker, cmd = m.picker.Update(msg)
-			batcher = append(batcher, cmd)
+		return m, cmd
+	case clearErr:
+		m.uploadingPath = ""
+		m.err = nil
+		return m, nil
+	case filepicker.FileSelected:
+		log.Println("Hey hi!!", msg.Path)
+		m.uploadingPath = msg.Path
 
-			if oldPath != m.cleanPath(m.picker.CurrentDirectory) {
-				m.dirInput.SetValue(m.cleanPath(m.picker.CurrentDirectory))
-			}
-		}
-	}
-
-	if m.path == "" && !m.dirInput.Focused() {
-		if didSelect, path := m.picker.DidSelectFile(msg); didSelect {
-			batcher = append(batcher, m.selectPath(path))
-		}
-	}
-
-	return m, tea.Batch(batcher...)
-}
-
-func (m *Model) selectPath(p string) tea.Cmd {
-	m.path = p
-	return tea.Batch(
-		m.spin.Tick,
-		func() tea.Msg {
-			f, err := os.Open(m.cleanPath(p))
+		return m, tea.Batch(func() tea.Msg {
+			f, err := os.Open(msg.Path)
 			if err != nil {
-				log.Fatal(err)
+				return uploaded{err: err}
 			}
-
 			defer f.Close()
 
 			err = m.api.UploadTSV(f)
-			if err != nil {
-				log.Fatal(err)
-			}
+			return uploaded{err: err}
+		}, m.spin.Tick)
+	}
 
-			return FileUploadComplete(true)
-		},
-	)
+	if m.uploadingPath == "" {
+		fp, cmd := m.filepicker.Update(msg)
+		m.filepicker = fp
+
+		return m, cmd
+	} else {
+		spin, cmd := m.spin.Update(m)
+		m.spin = spin
+		return m, cmd
+	}
+}
+
+type clearErr struct {}
+func clearErrCMD() tea.Msg {
+	<- time.After(5 * time.Second)
+	return clearErr{}
 }

@@ -5,10 +5,11 @@ import (
 	"log"
 	"os"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/screens/login"
+	"github.com/bank_data_tui/utils"
 	"github.com/bank_data_tui/utils/repo"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/joho/godotenv"
 )
 
@@ -24,7 +25,7 @@ const (
 
 type mainApp struct {
 	curFocusedScreen Screen
-	screenImp        tea.Model
+	screenImp        utils.Screen
 
 	width  int
 	height int
@@ -62,7 +63,7 @@ func main() {
 		app.switchToScreen(S_TRANS)
 	}
 
-	p := tea.NewProgram(app, tea.WithAltScreen())
+	p := tea.NewProgram(app)
 	if _, err := p.Run(); err != nil {
 		fmt.Println(err)
 	}

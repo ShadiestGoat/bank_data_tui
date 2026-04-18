@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strconv"
 
+	"charm.land/bubbles/v2/textinput"
 	"github.com/bank_data_tui/utils"
-	"github.com/charmbracelet/bubbles/textinput"
 )
 
 type ErrRequired struct {

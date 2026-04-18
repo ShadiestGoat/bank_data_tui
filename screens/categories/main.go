@@ -3,11 +3,11 @@ package categories
 import (
 	"slices"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/utils/editor"
 	"github.com/bank_data_tui/utils/listeditor"
 	"github.com/bank_data_tui/utils/repo"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 type categoryImpl struct {
@@ -37,7 +37,7 @@ func (m *categoryImpl) Update(msg tea.Msg) {
 			return c.ID == string(msg)
 		})
 		if i != -1 {
-			m.cache.Categories = slices.Delete(m.cache.Categories, i, i + 1)
+			m.cache.Categories = slices.Delete(m.cache.Categories, i, i+1)
 		}
 	case listeditor.ItemNew:
 		m.cache.Categories = append(m.cache.Categories, (*api.Category)(msg.Value.(*categoryProxy)))

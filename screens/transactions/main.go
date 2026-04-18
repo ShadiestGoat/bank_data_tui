@@ -5,13 +5,13 @@ import (
 	"slices"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/styles"
 	"github.com/bank_data_tui/utils"
 	"github.com/bank_data_tui/utils/repo"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type Model struct {
@@ -55,9 +55,9 @@ func (m Model) Init() tea.Cmd {
 
 const DE_DUPE_BUFFER = 25
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (utils.Screen, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "down":
 			if m.selected != len(m.items)-1 {
@@ -87,7 +87,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		if msg.Alt {
+		if msg.Mod.Contains(tea.ModAlt) {
 			m.forceSelIntoViewport()
 		} else {
 			m.forceViewportIntoSel()
@@ -130,7 +130,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if !m.hasHitLastPage && !m.nextPageLoading && m.indexIsVisible(-LOAD_OFFSET) {
-		batch = append(batch, m.reqPage(m.lastDataPage + 1))
+		batch = append(batch, m.reqPage(m.lastDataPage+1))
 	}
 
 	return m, tea.Batch(batch...)
@@ -195,7 +195,7 @@ func (m *Model) forceRequestPage(n int) tea.Cmd {
 		func() tea.Msg {
 			d, err := m.api.TransactionsFetch(api.TOR_AUTH, n, false)
 			if err != nil {
-				panic(err)
+				log.Panicln(err)
 			}
 
 			return newPageData{

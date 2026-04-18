@@ -4,40 +4,62 @@ import (
 	"errors"
 	"strings"
 
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bank_data_tui/styles"
 	"github.com/bank_data_tui/utils"
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/lipgloss"
 )
 
-func (c Model) View() string {
+func (c Model) View() (string, *tea.Cursor) {
 	if c.width == 0 {
-		return ""
+		return "", nil
 	}
 
 	sections := []string{}
 	valid := true
+
+	var cur *tea.Cursor
+	if !c.inButtons(c.focusedField) {
+		cur = c.inpFields[c.focusedField].Cursor()
+		cur.X += 2
+		cur.Y += c.dataFields[c.focusedField].Row * 4 + 1
+	}
 
 	// last row has special render handling
 	for _, row := range c.layout[:len(c.layout)-1] {
 		if len(row) == 1 {
 			i := row[0]
 			txt := &c.inpFields[i]
-			sections = append(sections, renderRowField(c.width, txt, c.dataFields[i], c.focusedField == i))
+			res, off := renderRowField(c.width, txt, c.dataFields[i], c.focusedField == i)
+			sections = append(sections, res)
 			if txt.Err != nil {
 				valid = false
 			}
+			if c.focusedField == i {
+				cur.X += off
+			}
 		} else {
 			parts := make([]string, 0, len(row))
-			for _, i := range row {
+			cursorPart := -1
+			for ri, i := range row {
 				txt := &c.inpFields[i]
-				parts = append(parts, renderField(txt, c.dataFields[i], c.focusedField == i))
+				focused := c.focusedField == i
+				parts = append(parts, renderField(txt, c.dataFields[i], focused))
 				if txt.Err != nil {
 					valid = false
 				}
+				if focused {
+					cursorPart = ri
+				}
 			}
 
-			sections = append(sections, utils.JoinHorizontalEqualSpread(c.width, parts...))
+			res, offsets := utils.JoinHorizontalEqualSpread(c.width, parts...)
+			if cursorPart != -1 {
+				cur.X += offsets[cursorPart]
+			}
+
+			sections = append(sections, res)
 		}
 	}
 
@@ -64,7 +86,7 @@ func (c Model) View() string {
 		scaleButtons(c.width, valid, selectedBtn, btnText),
 	)
 
-	return strings.Join(sections, "\n\n")
+	return strings.Join(sections, "\n\n"), cur
 }
 
 func scaleButtons(w int, valid bool, selectedBtn int, btnText []string) string {
@@ -86,10 +108,11 @@ func renderButtons(w int, valid bool, selectedBtn int, small bool, btnText []str
 		).Render(t)
 	}
 
-	return utils.JoinHorizontalEqualSpread(w, btns...)
+	out, _ := utils.JoinHorizontalEqualSpread(w, btns...)
+	return out
 }
 
-func renderRowField(w int, txt *textinput.Model, data *DataField, selected bool) string {
+func renderRowField(w int, txt *textinput.Model, data *DataField, selected bool) (string, int) {
 	fieldStyle := styles.STYLE_FIELD
 	if selected {
 		fieldStyle = fieldStyle.BorderForeground(styles.COLOR_MAIN)
@@ -101,7 +124,7 @@ func renderRowField(w int, txt *textinput.Model, data *DataField, selected bool)
 	}
 	field := fieldStyle.Render(renderTextField(txt))
 
-	return utils.JoinHorizontalWithSpacer(
+	res, offsets := utils.JoinHorizontalWithSpacer(
 		w, 1,
 		data.Title,
 		utils.Overflow(
@@ -110,6 +133,7 @@ func renderRowField(w int, txt *textinput.Model, data *DataField, selected bool)
 		)+" ",
 		field,
 	)
+	return res, offsets[len(offsets) - 1]
 }
 
 func renderErr(txt *textinput.Model) string {
@@ -133,7 +157,7 @@ func renderField(txt *textinput.Model, data *DataField, selected bool) string {
 	if data.StyleCB != nil {
 		fieldStyle = data.StyleCB(txt.Value(), txt.Err, selected, fieldStyle)
 	}
-	
+
 	err := renderErr(txt)
 	if err != "" {
 		fieldStyle = fieldStyle.BorderBottom(false)
@@ -141,7 +165,7 @@ func renderField(txt *textinput.Model, data *DataField, selected bool) string {
 	if txt.Value() != "" {
 		fieldStyle = fieldStyle.BorderTop(false)
 	}
-	
+
 	out := fieldStyle.Render(renderTextField(txt))
 	if err != "" {
 		out += "\n" + fakeBorder(false, fieldStyle, renderErr(txt), lipgloss.Width(out))
@@ -160,7 +184,7 @@ func renderField(txt *textinput.Model, data *DataField, selected bool) string {
 
 func renderTextField(txt *textinput.Model) string {
 	// Fuck your text field and it's horse
-	return lipgloss.NewStyle().Width(txt.Width + 1).MaxWidth(txt.Width + 1).Inline(true).Render(txt.View())
+	return lipgloss.NewStyle().Width(txt.Width() + 1).MaxWidth(txt.Width() + 1).Inline(true).Render(txt.View())
 }
 
 func extraFieldLength(txt *textinput.Model, data *DataField) int {
@@ -174,7 +198,7 @@ func extraFieldLength(txt *textinput.Model, data *DataField) int {
 
 func fakeBorder(top bool, style lipgloss.Style, str string, totalWidth int) string {
 	var (
-		horz       string
+		horz        string
 		leftCorner  string
 		rightCorner string
 	)
@@ -193,6 +217,6 @@ func fakeBorder(top bool, style lipgloss.Style, str string, totalWidth int) stri
 	newStyle := lipgloss.NewStyle().Foreground(style.GetBorderLeftForeground())
 
 	return newStyle.Render(leftCorner+horz) + " " +
-		lipgloss.NewStyle().Width(totalWidth - 6).Render(utils.Overflow(str, totalWidth-6)) +
+		lipgloss.NewStyle().Width(totalWidth-6).Render(utils.Overflow(str, totalWidth-6)) +
 		" " + newStyle.Render(horz+rightCorner)
 }

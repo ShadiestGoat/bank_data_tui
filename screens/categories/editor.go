@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strconv"
 
+	"charm.land/lipgloss/v2"
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/utils/editor"
 	"github.com/bank_data_tui/utils/listeditor"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/rivo/uniseg"
 )
@@ -44,13 +44,13 @@ func (c *categoryImpl) NewEditor(w, h int, v *categoryProxy) *editor.Model {
 				Title: "Name",
 				ID:    "name",
 				Value: &v.Name,
-				Row: 0,
+				Row:   0,
 			},
 			{
 				Title: "Color",
 				ID:    "color",
 				Value: &v.Color,
-				Row: 1,
+				Row:   1,
 				StyleCB: func(v string, err error, selected bool, cur lipgloss.Style) lipgloss.Style {
 					if !selected || err != nil {
 						return cur
@@ -63,7 +63,7 @@ func (c *categoryImpl) NewEditor(w, h int, v *categoryProxy) *editor.Model {
 				Title: "Icon",
 				ID:    "icon",
 				Value: &v.Icon,
-				Row: 2,
+				Row:   2,
 			},
 		},
 		func(_ bool) (string, error) {
@@ -80,7 +80,7 @@ func (c *categoryImpl) NewEditor(w, h int, v *categoryProxy) *editor.Model {
 			return verifyColor(s)
 		}),
 		editor.AddFieldValidator(2, func(s string) error {
-			if uniseg.GraphemeClusterCount(ansi.Strip(s)) != 1 {
+			if uniseg.GraphemeClusterCount(ansi.Strip(s)) != 1 || lipgloss.Width(s) != 1 {
 				return fmt.Errorf("Need icon that is 1 in width")
 			}
 

@@ -3,8 +3,9 @@ package main
 import (
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bank_data_tui/styles"
-	"github.com/charmbracelet/lipgloss"
 )
 
 var (
@@ -46,21 +47,56 @@ func (m mainApp) renderHeader() string {
 	return STYLE_HEADER.Render(lipgloss.JoinHorizontal(lipgloss.Top, left, spacer, right))
 }
 
-func (m mainApp) View() string {
-	box := lipgloss.NewStyle().Width(m.width).Height(m.height).MaxHeight(m.height).Align(lipgloss.Center, lipgloss.Top)
+func (m mainApp) renderTooSmall() string {
+	box := lipgloss.NewStyle().Width(m.width).Height(m.height).Align(lipgloss.Center, lipgloss.Center)
+	return box.Render("Too Small")
+}
+
+func (m mainApp) View() (v tea.View) {
+	v.AltScreen = true
+	v.WindowTitle = "Bank Data"
+	v.Cursor = nil
 
 	if m.width == 0 || m.height == 0 {
-		return ""
+		return
 	} else if m.width < 50 || m.height < 20 {
-		return box.AlignVertical(lipgloss.Center).Render("Too small")
+		v.SetContent(m.renderTooSmall())
+		return
 	}
 
-	s := m.screenImp.View()
+	s, c := m.screenImp.View()
+	v.Cursor = c
+
+	w, h := lipgloss.Width(s), lipgloss.Height(s)
+	if h > (m.height - HEADER_HEIGHT) || w > m.width {
+		v.Cursor = nil
+		v.SetContent(m.renderTooSmall())
+		return 
+	}
+
 	if m.curFocusedScreen == S_LOGIN {
-		return box.AlignVertical(lipgloss.Center).Render(s)
+		padTop := (m.height - h)/2
+		padLeft := (m.width - w)/2
+
+		if c != nil {
+			c.Y += padTop
+			c.X += padLeft
+		}
+
+		v.SetContent(lipgloss.NewStyle().Padding(padTop, 0, 0, padLeft).Render(s))
+		return
 	}
 
-	h := m.renderHeader()
+	header := m.renderHeader()
+	padTop := (m.height - h - HEADER_HEIGHT)/2
+	padLeft := (m.width - w)/2
 
-	return box.AlignHorizontal(lipgloss.Left).Render(lipgloss.JoinVertical(lipgloss.Center, h, s))
+	if c != nil {
+		c.Y += padTop + HEADER_HEIGHT
+		c.X += padLeft
+	}
+
+	v.SetContent(header + "\n" + lipgloss.NewStyle().Padding(padTop, 0, 0, padLeft).Render(s))
+
+	return v
 }

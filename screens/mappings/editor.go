@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	"charm.land/bubbles/v2/textinput"
 	"github.com/bank_data_tui/api"
 	"github.com/bank_data_tui/utils/editor"
 	"github.com/bank_data_tui/utils/listeditor"
-	"github.com/charmbracelet/bubbles/textinput"
 )
 
 type mappingProxy api.Mapping
